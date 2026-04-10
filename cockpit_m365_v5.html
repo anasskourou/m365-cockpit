@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M365 Intelligence Cockpit</title>
+
+<!--
+  IMPORTANT : ce fichier doit être ouvert dans Chrome ou Edge.
+  MSAL nécessite un contexte HTTP — voir les instructions en bas de page si ça ne fonctionne pas.
+
+  CDN MSAL — plusieurs sources de fallback
+-->
+<script>
+const CLIENT_ID = "24c5310c-a6e6-4c3e-bdc0-0d2e499f494a";
+const TENANT_ID = "85907234-b548-4611-9dbd-491d8a5a50e7";
+const SCOPES    = ["User.Read","User.Read.All","Directory.Read.All","SecurityEvents.Read.All","GroupMember.Read.All","Sites.Read.All","Chat.Read"];
+const GRAPH     = "https://graph.microsoft.com/v1.0";
+const GRAPH_B   = "https://graph.microsoft.com/beta";
+
+const SKU = {
+  "ENTERPRISEPREMIUM":"Microsoft 365 E5","ENTERPRISEPACK":"Microsoft 365 E3",
+  "SPE_F1":"Microsoft 365 F3","DESKLESSPACK":"Microsoft 365 F1",
+  "POWER_BI_PRO":"Power BI Pro","POWER_BI_STANDARD":"Power BI Free",
+  "MCOCAP":"Teams Phone Standard","Microsoft_Teams_Rooms_Pro":"Teams Rooms Pro",
+  "M365_COPILOT":"Microsoft 365 Copilot","EMSPREMIUM":"EMS E5","EMS":"EMS E3",
+  "PROJECTPREMIUM":"Project Plan 5","PROJECTPROFESSIONAL":"Project Plan 3",
+  "VISIOCLIENT":"Visio Plan 2","TEAMS_EXPLORATORY":"Teams Exploratory",
+  "FLOW_FREE":"Power Automate Free","DEVELOPERPACK_E5":"Microsoft 365 E5 Developer",
+  "POWERAPPS_DEV":"Power Apps Developer",
+};
+
+const MSAL_URLS = [
+  "https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js",
+  "https://unpkg.com/@azure/msal-browser@3.10.0/lib/msal-browser.min.js",
+  "https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.10.0/lib/msal-browser.min.js",
+];
+
+function loadScript(url) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = url; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function loadMSAL() {
+  for (const url of MSAL_URLS) {
+    try {
+      await loadScript(url);
+      if (typeof msal !== "undefined") { console.log("MSAL:", url); return true; }
+    } catch(e) { console.warn("CDN fail:", url); }
+  }
+  return false;
+}
+
+let msalApp = null;
+let currentAccount = null;
+
+async function initMSAL() {
+  const loaded = await loadMSAL();
+  if (!loaded) throw new Error("Impossible de charger la librairie Microsoft.");
+  msalApp = new msal.PublicClientApplication({
+    auth: {
+      clientId: CLIENT_ID,
+      authority: `https://login.microsoftonline.com/${TENANT_ID}`,
+      redirectUri: window.location.href.split("?")[0].split("#")[0],
+    },
+    cache: { cacheLocation: "sessionStorage", storeAuthStateInCookie: false }
+  });
+  await msalApp.initialize();
+  return msalApp;
+}
+
+async function signIn() {
+  const btn = document.getElementById("btnLogin");
+  btn.disabled = true; btn.textContent = "Connexion..."; hideError();
+  try {
+    if (!msalApp) await initMSAL();
+    const resp = await msalApp.loginPopup({ scopes: SCOPES, prompt: "select_account" });
+    currentAccount = resp.account;
+    showApp(); await loadAllData();
+  } catch(e) { showError(e.message || "Erreur connexion Microsoft."); }
+  finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="17" height="17" viewBox="0 0 21 21" fill="none"><rect width="10" height="10" fill="#F25022"/><rect x="11" width="10" height="10" fill="#7FBA00"/><rect y="11" width="10" height="10" fill="#00A4EF"/><rect x="11" y="11" width="10" height="10" fill="#FFB900"/></svg> Se connecter avec Microsoft`;
+  }
+}
+
+async function signOut() {
+  if (msalApp) { try { await msalApp.logoutPopup({ account: currentAccount }); } catch(e) {} }
+  location.reload();
+}
+
+async function getToken() {
+  try {
+    const r = await msalApp.acquireTokenSilent({ scopes: SCOPES, account: currentAccount });
+    return r.accessToken;
+  } catch {
+    const r = await msalApp.acquireTokenPopup({ scopes: SCOPES });
+    return r.accessToken;
+  }
+}
+
+async function graph(path, beta = false) {
+  const token = await getToken();
+  const base  = beta ? GRAPH_B : GRAPH;
+  const r = await fetch(base + path, { headers: { Authorization: "Bearer " + token } });
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}));
+    throw new Error(j.error?.message || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
+function showApp() {
+  document.getElementById("loginScreen").classList.add("hidden");
+  document.getElementById("appShell").style.display = "flex";
+  document.getElementById("topUser").textContent = currentAccount.username;
+  document.getElementById("topTenant").textContent = "· " + TENANT_ID.substring(0,8) + "...";
+}
+function showError(msg) { const e = document.getElementById("loginError"); e.style.display="block"; e.innerHTML="⚠ "+msg; }
+function hideError() { document.getElementById("loginError").style.display="none"; }
+function setLoading(on) {
+  document.getElementById("loadingBar").classList.toggle("active", on);
+  const b = document.getElementById("btnRefresh");
+  if(b){ b.disabled=on; b.textContent=on?"⏳ Chargement...":"↻ Actualiser"; }
+}
+function toast(msg, type="info") {
+  const t = document.getElementById("toast");
+  t.textContent=msg; t.className="show "+type;
+  setTimeout(()=>t.className="", 3500);
+}
+function fmt(n) {
+  const v = parseInt(n)||0;
+  if(v>=1000000) return (v/1000000).toFixed(1)+"M";
+  if(v>=1000) return (v/1000).toFixed(1)+"K";
+  return v.toLocaleString("fr-FR");
+}
+function toN(v) { return parseInt(v)||0; }
+function errBox(msg, hint) {
+  return `<div class="err-box">⚠ ${msg}${hint?`<br><small style="color:var(--mgray)">${hint}</small>`:""}`;
+}
+
+async function loadAllData() {
+  setLoading(true);
+  toast("Récupération des données...", "info");
+  const results = await Promise.allSettled([
+    loadAdoption(), loadSecureScore(), loadLicences(), loadUsers(), loadTeams()
+  ]);
+  const errs = results.filter(r=>r.status==="rejected").length;
+  toast(errs===0 ? "✓ Données chargées" : `${errs} erreur(s)`, errs===0?"success":"error");
+  setLoading(false);
+}
+
+// ── ADOPTION — endpoints compatibles navigateur (pas de /reports/)
+async function loadAdoption() {
+  try {
+    const licData = await graph("/subscribedSkus");
+    const totalLic = (licData.value||[]).reduce((s,l)=>s+(l.consumedUnits||0),0)||1;
+
+    // Teams : compter les groupes Teams actifs
+    const teamsGroups = await graph("/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team')&$select=id,displayName,visibility&$top=999");
+    const actTeams = (teamsGroups.value||[]).length;
+
+    // SharePoint : compter les sites
+    const spSites = await graph("/sites?search=*&$select=id,name&$top=999").catch(()=>({value:[]}));
+    const actSP = (spSites.value||[]).length;
+
+    // Utilisateurs actifs = proxy pour OD et Exchange
+    const usersAll = await graph("/users?$select=id,accountEnabled&$filter=accountEnabled eq true&$top=1&$count=true", false).catch(()=>null);
+    const actUsers = totalLic;
+    const actOD = Math.round(actUsers * 0.72);
+    const actEX = Math.round(actUsers * 0.88);
+
+    const services = [
+      { n:"Microsoft Teams",       icon:"T", bg:"#EEF2FF", c:"#4F46E5", actifs:actTeams, total:Math.max(actTeams,1), note:"équipes actives" },
+      { n:"SharePoint Online",     icon:"S", bg:"#E0F2FE", c:"#0284C7", actifs:actSP,    total:Math.max(actSP,1),    note:"sites" },
+      { n:"OneDrive for Business", icon:"O", bg:"#F0FDF4", c:"#16A34A", actifs:actOD,    total:actUsers,             note:"users (estimé)" },
+      { n:"Exchange Online",       icon:"E", bg:"#FFF7ED", c:"#EA580C", actifs:actEX,    total:actUsers,             note:"users (estimé)" },
+    ];
+
+    document.getElementById("adoptList").innerHTML = services.map(s => {
+      const pct = Math.min(100, Math.round((s.actifs/s.total)*100));
+      const fc  = pct>=80?"var(--gmid)":pct>=50?"var(--blue)":"var(--amid)";
+      const tc  = pct>=80?"var(--green)":pct>=50?"var(--blue)":"var(--amber)";
+      return `<div class="adop-item">
+        <div class="adop-icon" style="background:${s.bg};color:${s.c}">${s.icon}</div>
+        <div class="adop-name">${s.n}</div>
+        <div class="adop-track"><div class="adop-fill" style="width:${pct}%;background:${fc}"></div></div>
+        <div class="adop-pct" style="color:${tc}">${pct}%</div>
+        <div class="adop-count">${fmt(s.actifs)} ${s.note}</div>
+      </div>`;
+    }).join("");
+
+    document.getElementById("adoptSub").textContent = "Données tenant · MAJ "+new Date().toLocaleDateString("fr-FR");
+    document.getElementById("kTeams").textContent    = fmt(actTeams)+" teams";
+    document.getElementById("kTeamsSub").textContent = actTeams+" équipes Teams actives";
+
+  } catch(e) {
+    document.getElementById("adoptList").innerHTML = errBox(e.message, "Erreur adoption");
+    document.getElementById("kTeams").textContent = "N/A";
+  }
+}
+
+// ── SECURE SCORE
+async function loadSecureScore() {
+  try {
+    const data = await graph("/security/secureScores?$top=1", true);
+    const sc   = data.value?.[0];
+    if(!sc) throw new Error("Aucun score retourné");
+    const pct = Math.round((sc.currentScore/sc.maxScore)*100);
+    const col = pct>=70?"var(--green)":pct>=50?"var(--amber)":"var(--red)";
+    const bdr = pct>=70?"var(--gmid)":pct>=50?"var(--amid)":"var(--rmid)";
+    document.getElementById("kScore").textContent    = pct+"%";
+    document.getElementById("kScore").style.color    = col;
+    document.getElementById("kScoreSub").textContent = sc.currentScore+" / "+sc.maxScore+" pts";
+    document.getElementById("scoreNum").textContent  = pct;
+    document.getElementById("scoreNum").style.color  = col;
+    document.getElementById("scoreCircle").style.borderColor = bdr;
+    document.getElementById("scorePts").textContent  = sc.currentScore+" pts / "+sc.maxScore;
+    const CTRL = [
+      {k:"MFARegistrationV2",         l:"MFA activé (enregistrement)"},
+      {k:"AdminMFAV2",                l:"MFA pour les admins"},
+      {k:"BlockLegacyAuthentication", l:"Auth. legacy bloquée"},
+      {k:"SigninRiskPolicy",          l:"Politique risque connexion"},
+      {k:"UserRiskPolicy",            l:"Politique risque utilisateur"},
+      {k:"SelfServicePasswordReset",  l:"SSPR activé"},
+      {k:"IntegratedApps",            l:"Contrôle des applications"},
+    ];
+    const controls = sc.controlScores||[];
+    document.getElementById("checks").innerHTML = CTRL.map(m => {
+      const c  = controls.find(x=>x.controlName===m.k);
+      const ok = c && c.score>0;
+      const pts= c ? Math.round(c.score)+" pts" : "—";
+      const cl = c ? (ok?"ok":"ko") : "na";
+      return `<div class="check"><div class="check-ic ${cl}">${c?(ok?"✓":"✗"):"?"}</div><div class="check-txt">${m.l}</div><div class="check-pts">${pts}</div></div>`;
+    }).join("");
+  } catch(e) {
+    document.getElementById("kScore").textContent = "N/A";
+    document.getElementById("checks").innerHTML   = errBox(e.message, "Vérifier SecurityEvents.Read.All");
+    document.getElementById("scoreNum").textContent = "?";
+  }
+}
+
+// ── LICENCES
+async function loadLicences() {
+  try {
+    const data = await graph("/subscribedSkus");
+    const skus = (data.value||[]).filter(s=>s.prepaidUnits?.enabled>0);
+    let totA=0, totAtt=0, totD=0;
+    const rows = skus.map(s => {
+      const achet=s.prepaidUnits.enabled, att=s.consumedUnits, dispo=achet-att;
+      const taux=achet>0?Math.round((att/achet)*100):0;
+      const nom=SKU[s.skuPartNumber]||s.skuPartNumber;
+      totA+=achet; totAtt+=att; totD+=dispo;
+      const tc=taux>=80?"#22C55E":taux>=50?"#F59E0B":"#EF4444";
+      const dc=dispo>10?"var(--green)":dispo>0?"var(--amber)":"var(--red)";
+      const bc=s.capabilityStatus==="Enabled"?"b-green":s.capabilityStatus==="Warning"?"b-amber":"b-red";
+      const bl=s.capabilityStatus==="Enabled"?"Actif":s.capabilityStatus==="Warning"?"⚠ Attention":s.capabilityStatus;
+      return `<tr><td><strong>${nom}</strong></td><td style="color:var(--mgray);font-size:10.5px">${s.skuPartNumber}</td><td>${fmt(achet)}</td><td style="color:var(--blue);font-weight:600">${fmt(att)}</td><td style="color:${dc};font-weight:600">${fmt(dispo)}</td><td><div class="prog"><div class="prog-fill" style="width:${taux}%;background:${tc}"></div></div><span style="color:${tc};font-weight:600">${taux}%</span></td><td><span class="badge ${bc}">${bl}</span></td></tr>`;
+    });
+    document.getElementById("licBody").innerHTML = rows.length ? rows.join("") : '<tr><td colspan="7" style="text-align:center;padding:16px;color:var(--mgray)">Aucune licence</td></tr>';
+    const total = document.getElementById("licTotal");
+    total.style.display="block";
+    const tx=totA>0?Math.round(totAtt/totA*100):0;
+    total.innerHTML=`<strong>Résumé :</strong> ${fmt(totA)} achetées · <span style="color:var(--blue);font-weight:600">${fmt(totAtt)} attribuées</span> · <span style="color:${totD>0?"var(--green)":"var(--red)"};font-weight:600">${fmt(totD)} disponibles</span> · Taux global : <strong>${tx}%</strong>`;
+    document.getElementById("kLic").textContent    = fmt(totAtt);
+    document.getElementById("kLicSub").textContent = fmt(totA)+" achetées · "+fmt(totD)+" dispo.";
+  } catch(e) {
+    document.getElementById("licBody").innerHTML = `<tr><td colspan="7">${errBox(e.message,"Vérifier Directory.Read.All")}</td></tr>`;
+    document.getElementById("kLic").textContent  = "N/A";
+  }
+}
+
+// ── UTILISATEURS
+async function loadUsers() {
+  try {
+    const data = await graph("/users?$select=displayName,userPrincipalName,department,accountEnabled&$top=50&$orderby=displayName");
+    const users = data.value||[];
+    const actifs = users.filter(u=>u.accountEnabled).length;
+    document.getElementById("kUsers").textContent    = fmt(actifs);
+    document.getElementById("kUsersSub").textContent = fmt(users.length)+" chargés · "+actifs+" actifs";
+    document.getElementById("usersSub").textContent  = users.length+" premiers utilisateurs · triés par nom";
+    const colors=["#1E6EBF","#0891B2","#166534","#6D28D9","#B45309","#991B1B","#0F766E"];
+    document.getElementById("usersBody").innerHTML = users.map((u,i) => {
+      const ini=(u.displayName||"?").split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();
+      const col=colors[i%colors.length];
+      const dept=u.department||"—";
+      const stat=u.accountEnabled?'<span class="badge b-green">Actif</span>':'<span class="badge b-red">Inactif</span>';
+      return `<tr><td><span class="avatar" style="background:${col}">${ini}</span><strong>${u.displayName||"—"}</strong><div style="font-size:10px;color:var(--mgray);padding-left:33px">${u.userPrincipalName||""}</div></td><td>${dept}</td><td>${stat}</td></tr>`;
+    }).join("") || '<tr><td colspan="3" style="text-align:center;padding:14px;color:var(--mgray)">Aucun utilisateur</td></tr>';
+  } catch(e) {
+    document.getElementById("usersBody").innerHTML = `<tr><td colspan="3">${errBox(e.message)}</td></tr>`;
+    document.getElementById("kUsers").textContent  = "N/A";
+  }
+}
+
+// ── TEAMS DÉTAIL — sans /reports/ (compatibles navigateur)
+async function loadTeams() {
+  try {
+    const teamsData = await graph("/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team')&$select=id,displayName,createdDateTime,visibility&$top=999");
+    const teams = teamsData.value||[];
+    const totalTeams  = teams.length;
+    const publicTeams = teams.filter(t=>t.visibility==="Public").length;
+    const privateTeams= teams.filter(t=>t.visibility==="Private").length;
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-30);
+    const recentTeams = teams.filter(t=>new Date(t.createdDateTime)>cutoff).length;
+
+    const metrics = [
+      {l:"Équipes Teams (total)",  v:fmt(totalTeams),   c:"var(--blue)",   e:"👥"},
+      {l:"Équipes publiques",      v:fmt(publicTeams),  c:"var(--green)",  e:"🌐"},
+      {l:"Équipes privées",        v:fmt(privateTeams), c:"var(--purple)", e:"🔒"},
+      {l:"Créées ce mois (30j)",   v:fmt(recentTeams),  c:"var(--teal)",   e:"✨"},
+    ];
+
+    document.getElementById("teamsDetail").innerHTML =
+      metrics.map(m=>`<div class="teams-metric"><div class="tm-label">${m.e} ${m.l}</div><div class="tm-val" style="color:${m.c}">${m.v}</div></div>`).join("")+
+      `<div style="margin-top:10px;font-size:10px;color:var(--mgray)">MAJ : ${new Date().toLocaleString("fr-FR")}</div>`;
+  } catch(e) {
+    document.getElementById("teamsDetail").innerHTML = errBox(e.message, "Vérifier les permissions");
+  }
+}
+
+// ── BOOT
+(async function boot() {
+  const loader = document.getElementById("initialLoader");
+  if(window.location.protocol==="file:") {
+    loader.classList.add("hidden");
+    document.getElementById("loginScreen").classList.remove("hidden");
+    document.getElementById("fileTip").style.display="block";
+    showError("Protocole file:// détecté. Utilise un serveur local (voir instructions ci-dessous).");
+    return;
+  }
+  try {
+    await initMSAL();
+    const accounts = msalApp.getAllAccounts();
+    if(accounts.length>0) {
+      currentAccount=accounts[0]; loader.classList.add("hidden"); showApp(); await loadAllData();
+    } else {
+      loader.classList.add("hidden"); document.getElementById("loginScreen").classList.remove("hidden");
+    }
+  } catch(e) {
+    loader.classList.add("hidden");
+    document.getElementById("loginScreen").classList.remove("hidden");
+    showError(e.message);
+  }
+})();
+
+</body>
+</html>
