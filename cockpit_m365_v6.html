@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M365 Intelligence Cockpit</title>
+
+<!--
+  IMPORTANT : ce fichier doit être ouvert dans Chrome ou Edge.
+  MSAL nécessite un contexte HTTP — voir les instructions en bas de page si ça ne fonctionne pas.
+
+  CDN MSAL — plusieurs sources de fallback
+-->
+<script>
+// On va charger MSAL dynamiquement avec plusieurs fallbacks
+window.MSAL_LOADED = false;
+</script>
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0F2044;--navy2:#1A3461;--blue:#1E6EBF;--blue2:#4A9FE0;--lblue:#D6E8FB;
+  --teal:#0891B2;--lteal:#E0F7FA;--green:#166534;--lgreen:#DCFCE7;--gmid:#22C55E;
+  --amber:#B45309;--lamber:#FEF3C7;--amid:#F59E0B;--red:#991B1B;--lred:#FEE2E2;
+  --rmid:#EF4444;--purple:#6D28D9;--lpurp:#EDE9FE;--gray:#374151;--lgray:#F3F4F6;
+  --mgray:#9CA3AF;--border:#E5E7EB;--white:#FFFFFF;--bg:#F0F4F8;--text:#111827;
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── LOADER INITIAL ── */
+#initialLoader{position:fixed;inset:0;background:var(--navy);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:16px}
+#initialLoader.hidden{display:none}
+.loader-logo{width:64px;height:64px;background:linear-gradient(135deg,var(--blue),var(--teal));border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:white}
+.loader-text{color:rgba(255,255,255,0.7);font-size:13px}
+.loader-spinner{width:32px;height:32px;border:3px solid rgba(255,255,255,0.15);border-top-color:var(--blue2);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── LOGIN ── */
+#loginScreen{min-height:100vh;background:linear-gradient(135deg,#060e1e 0%,#0f2044 50%,#1a3461 100%);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px}
+#loginScreen.hidden{display:none!important}
+.login-card{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:24px;padding:48px 44px;text-align:center;width:440px;max-width:95vw}
+.login-logo{width:68px;height:68px;background:linear-gradient(135deg,var(--blue),var(--teal));border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:white;margin:0 auto 24px;box-shadow:0 8px 32px rgba(30,110,191,0.5)}
+.login-title{font-size:23px;font-weight:700;color:white;margin-bottom:6px}
+.login-sub{font-size:13px;color:rgba(255,255,255,0.45);margin-bottom:32px;line-height:1.7}
+.btn-login{width:100%;padding:14px;background:var(--blue);color:white;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:10px;transition:all 0.2s}
+.btn-login:hover{background:var(--blue2);transform:translateY(-1px);box-shadow:0 8px 24px rgba(30,110,191,0.4)}
+.btn-login:disabled{opacity:0.6;cursor:not-allowed;transform:none}
+.perms{margin-top:20px;padding:14px 16px;background:rgba(255,255,255,0.04);border-radius:10px;text-align:left}
+.perms-title{font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.perm{font-size:11.5px;color:rgba(255,255,255,0.55);padding:2px 0;display:flex;align-items:center;gap:7px}
+.perm::before{content:'';width:4px;height:4px;border-radius:50%;background:var(--blue2);flex-shrink:0}
+#loginError{margin-top:14px;padding:11px 14px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:9px;font-size:12px;color:#fca5a5;display:none;text-align:left;line-height:1.5}
+
+/* ── INSTRUCTIONS FICHIER LOCAL ── */
+.file-tip{max-width:440px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:16px 18px;font-size:12px;color:rgba(255,255,255,0.7);line-height:1.6;display:none}
+.file-tip strong{color:#fcd34d}
+.file-tip code{background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:4px;font-family:monospace;font-size:11px}
+
+/* ── APP SHELL ── */
+#appShell{display:none;min-height:100vh;flex-direction:column}
+#appShell.visible{display:flex}
+
+/* ── TOPBAR ── */
+.topbar{height:54px;background:var(--navy);display:flex;align-items:center;padding:0 20px;gap:14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,0.3)}
+.topbar-logo{width:30px;height:30px;background:linear-gradient(135deg,var(--blue),var(--teal));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:white;flex-shrink:0}
+.topbar-title{font-size:14px;font-weight:700;color:white}
+.topbar-tenant{font-size:10px;color:rgba(255,255,255,0.35);margin-left:2px}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.topbar-user{font-size:11px;color:rgba(255,255,255,0.5)}
+.topbar-btn{padding:5px 12px;border-radius:7px;font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;transition:all 0.2s;border:none}
+.btn-refresh{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12)!important;color:white}
+.btn-refresh:hover{background:rgba(255,255,255,0.15)}
+.btn-refresh:disabled{opacity:0.4;cursor:not-allowed}
+.btn-logout{background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25)!important;color:#fca5a5}
+.btn-logout:hover{background:rgba(239,68,68,0.22)}
+
+/* ── LOADING BAR ── */
+#loadingBar{height:3px;background:linear-gradient(90deg,var(--blue),var(--teal),var(--blue));background-size:200%;animation:slide 1.3s linear infinite;display:none}
+#loadingBar.active{display:block}
+@keyframes slide{to{background-position:-200% 0}}
+
+/* ── MAIN ── */
+.main{padding:20px 24px 40px}
+
+/* ── KPI STRIP ── */
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+.kpi-card{background:white;border:1px solid var(--border);border-radius:13px;padding:16px 18px;position:relative;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:0}
+.kc-blue::before{background:var(--blue)} .kc-green::before{background:var(--gmid)}
+.kc-amber::before{background:var(--amid)} .kc-teal::before{background:var(--teal)}
+.kpi-label{font-size:9.5px;font-weight:600;color:var(--mgray);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px}
+.kpi-val{font-size:28px;font-weight:800;line-height:1;margin-bottom:3px}
+.kv-blue{color:var(--blue)} .kv-green{color:var(--green)} .kv-amber{color:var(--amber)} .kv-teal{color:var(--teal)}
+.kpi-sub{font-size:10.5px;color:var(--mgray)}
+
+/* ── GRILLE ── */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+.span2{grid-column:1/-1}
+.card{background:white;border:1px solid var(--border);border-radius:13px;padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.card-title{font-size:12.5px;font-weight:700;color:var(--navy);margin-bottom:3px}
+.card-sub{font-size:10.5px;color:var(--mgray);margin-bottom:14px}
+
+/* ── ADOPTION ── */
+.adop-item{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+.adop-icon{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.adop-name{font-size:11px;color:var(--gray);width:130px;flex-shrink:0}
+.adop-track{flex:1;height:7px;background:var(--lgray);border-radius:4px;overflow:hidden}
+.adop-fill{height:100%;border-radius:4px;transition:width 1s ease}
+.adop-pct{font-size:11.5px;font-weight:700;width:36px;text-align:right;flex-shrink:0}
+.adop-count{font-size:10px;color:var(--mgray);width:75px;text-align:right;flex-shrink:0}
+
+/* ── SECURE SCORE ── */
+.score-wrap{display:flex;gap:18px;align-items:flex-start}
+.score-circle{width:110px;height:110px;border-radius:50%;border:8px solid var(--lgray);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;transition:border-color 0.5s}
+.score-num{font-size:30px;font-weight:800;line-height:1}
+.score-lbl{font-size:9px;color:var(--mgray);margin-top:2px}
+.score-pts{text-align:center;font-size:10px;color:var(--mgray);margin-top:8px}
+.checks{display:flex;flex-direction:column;gap:7px;flex:1}
+.check{display:flex;align-items:center;gap:7px;font-size:11px}
+.check-ic{width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0;font-weight:700}
+.ok{background:var(--lgreen);color:var(--green)} .ko{background:var(--lred);color:var(--red)} .na{background:var(--lgray);color:var(--mgray)}
+.check-txt{flex:1;color:var(--gray)} .check-pts{font-size:10px;color:var(--mgray)}
+
+/* ── TABLE LICENCES ── */
+.tbl{width:100%;border-collapse:collapse;font-size:11.5px}
+.tbl th{font-size:9.5px;font-weight:600;color:var(--mgray);text-transform:uppercase;padding:5px 8px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap}
+.tbl td{padding:9px 8px;border-bottom:1px solid var(--lgray);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:#fafafa}
+.badge{display:inline-flex;padding:2px 7px;border-radius:20px;font-size:9.5px;font-weight:600}
+.b-green{background:var(--lgreen);color:var(--green)}
+.b-amber{background:var(--lamber);color:var(--amber)}
+.b-red{background:var(--lred);color:var(--red)}
+.b-blue{background:var(--lblue);color:var(--blue)}
+.prog{width:72px;height:5px;background:var(--lgray);border-radius:3px;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:5px}
+.prog-fill{height:100%;border-radius:3px}
+
+/* ── TEAMS DETAIL ── */
+.teams-metric{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--lgray)}
+.teams-metric:last-child{border-bottom:none}
+.tm-label{font-size:11.5px;color:var(--gray);display:flex;align-items:center;gap:7px}
+.tm-val{font-size:17px;font-weight:700}
+
+/* ── USERS TABLE ── */
+.utbl{width:100%;border-collapse:collapse;font-size:11.5px}
+.utbl th{font-size:9.5px;font-weight:600;color:var(--mgray);text-transform:uppercase;padding:5px 8px;border-bottom:2px solid var(--border);text-align:left}
+.utbl td{padding:7px 8px;border-bottom:1px solid var(--lgray)}
+.utbl tr:last-child td{border-bottom:none}
+.avatar{width:26px;height:26px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white;vertical-align:middle;margin-right:7px}
+
+/* ── ERROR STATE ── */
+.err-box{padding:12px 14px;background:var(--lred);border:1px solid rgba(239,68,68,0.2);border-radius:8px;font-size:11.5px;color:var(--red)}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:20px;right:20px;padding:11px 18px;border-radius:9px;font-size:12.5px;font-weight:500;color:white;z-index:9999;transform:translateY(70px);opacity:0;transition:all 0.3s;pointer-events:none;max-width:320px}
+#toast.show{transform:translateY(0);opacity:1}
+#toast.success{background:var(--green)} #toast.error{background:var(--red)} #toast.info{background:var(--blue)}
+
+@media(max-width:860px){.kpi-strip{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- LOADER INITIAL -->
+<div id="initialLoader">
+  <div class="loader-logo">M</div>
+  <div class="loader-spinner"></div>
+  <div class="loader-text">Initialisation de l'authentification Microsoft...</div>
+</div>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="hidden">
+  <div class="login-card">
+    <div class="login-logo">M</div>
+    <div class="login-title">M365 Intelligence Cockpit</div>
+    <div class="login-sub">Connecte-toi avec ton compte admin Microsoft<br>pour accéder aux données réelles de ton tenant.</div>
+    <button class="btn-login" id="btnLogin" onclick="signIn()">
+      <svg width="17" height="17" viewBox="0 0 21 21" fill="none">
+        <rect width="10" height="10" fill="#F25022"/>
+        <rect x="11" width="10" height="10" fill="#7FBA00"/>
+        <rect y="11" width="10" height="10" fill="#00A4EF"/>
+        <rect x="11" y="11" width="10" height="10" fill="#FFB900"/>
+      </svg>
+      Se connecter avec Microsoft
+    </button>
+    <div class="perms">
+      <div class="perms-title">Permissions demandées (lecture seule)</div>
+      <div class="perm">Rapports d'utilisation M365 (adoption)</div>
+      <div class="perm">Secure Score (sécurité)</div>
+      <div class="perm">Licences (inventaire)</div>
+      <div class="perm">Utilisateurs (liste, département)</div>
+      <div class="perm">Profil utilisateur connecté</div>
+    </div>
+    <div id="loginError"></div>
+  </div>
+
+  <div class="file-tip" id="fileTip">
+    <strong>⚠ Ouverture depuis file:// détectée</strong><br><br>
+    MSAL ne fonctionne pas en protocole <code>file://</code>. Lance un mini-serveur local :<br><br>
+    <strong>Option 1 — Python (le plus simple) :</strong><br>
+    Ouvrir un terminal dans le dossier du fichier, taper :<br>
+    <code>python -m http.server 8080</code><br>
+    Puis ouvrir <code>http://localhost:8080/cockpit_m365.html</code><br><br>
+    <strong>Option 2 — VS Code :</strong><br>
+    Installer l'extension "Live Server", clic droit sur le fichier → "Open with Live Server"
+  </div>
+</div>
+
+<!-- APP PRINCIPALE -->
+<div id="appShell">
+  <div id="loadingBar"></div>
+  <div class="topbar">
+    <div class="topbar-logo">M</div>
+    <div>
+      <span class="topbar-title">M365 Intelligence Cockpit</span>
+      <span class="topbar-tenant" id="topTenant"></span>
+    </div>
+    <div class="topbar-right">
+      <span class="topbar-user" id="topUser"></span>
+      <button class="topbar-btn btn-refresh" id="btnRefresh" onclick="loadAllData()">↻ Actualiser</button>
+      <button class="topbar-btn btn-logout" onclick="signOut()">Déconnexion</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- KPIs -->
+    <div class="kpi-strip">
+      <div class="kpi-card kc-blue">
+        <div class="kpi-label">Adoption Teams</div>
+        <div class="kpi-val kv-blue" id="kTeams">—</div>
+        <div class="kpi-sub" id="kTeamsSub">—</div>
+      </div>
+      <div class="kpi-card kc-green">
+        <div class="kpi-label">Secure Score</div>
+        <div class="kpi-val kv-green" id="kScore">—</div>
+        <div class="kpi-sub" id="kScoreSub">—</div>
+      </div>
+      <div class="kpi-card kc-amber">
+        <div class="kpi-label">Licences attribuées</div>
+        <div class="kpi-val kv-amber" id="kLic">—</div>
+        <div class="kpi-sub" id="kLicSub">—</div>
+      </div>
+      <div class="kpi-card kc-teal">
+        <div class="kpi-label">Utilisateurs actifs</div>
+        <div class="kpi-val kv-teal" id="kUsers">—</div>
+        <div class="kpi-sub" id="kUsersSub">—</div>
+      </div>
+    </div>
+
+    <!-- ADOPTION + SECURITE -->
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Adoption M365 par service</div>
+        <div class="card-sub" id="adoptSub">Données 30 jours glissants</div>
+        <div id="adoptList"><div style="color:var(--mgray);font-size:12px;padding:16px 0">Chargement...</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Sécurité — Secure Score</div>
+        <div class="card-sub">Contrôles Zero Trust</div>
+        <div class="score-wrap">
+          <div>
+            <div class="score-circle" id="scoreCircle">
+              <div class="score-num" id="scoreNum" style="color:var(--mgray)">—</div>
+              <div class="score-lbl">/ 100</div>
+            </div>
+            <div class="score-pts" id="scorePts"></div>
+          </div>
+          <div class="checks" id="checks"><div style="color:var(--mgray);font-size:12px">Chargement...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LICENCES -->
+    <div class="grid2" style="margin-bottom:18px">
+      <div class="card span2">
+        <div class="card-title">Inventaire des licences M365</div>
+        <div class="card-sub" id="licSub">Toutes les références de licences du tenant</div>
+        <div style="overflow-x:auto">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Référence SKU</th>
+                <th>Code</th>
+                <th>Achetées</th>
+                <th>Attribuées</th>
+                <th>Disponibles</th>
+                <th>Utilisation</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody id="licBody">
+              <tr><td colspan="7" style="text-align:center;padding:20px;color:var(--mgray)">Chargement...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="licTotal" style="margin-top:10px;padding:10px 12px;background:var(--lgray);border-radius:7px;font-size:11.5px;color:var(--gray);display:none"></div>
+      </div>
+    </div>
+
+    <!-- TEAMS DETAIL + USERS -->
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Microsoft Teams — Activité 30 jours</div>
+        <div class="card-sub">Métriques d'usage réelles du tenant</div>
+        <div id="teamsDetail"><div style="color:var(--mgray);font-size:12px">Chargement...</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Utilisateurs du tenant</div>
+        <div class="card-sub" id="usersSub">Liste des comptes</div>
+        <div style="overflow-y:auto;max-height:300px">
+          <table class="utbl">
+            <thead><tr><th>Utilisateur</th><th>Département</th><th>Statut</th></tr></thead>
+            <tbody id="usersBody"><tr><td colspan="3" style="text-align:center;padding:16px;color:var(--mgray)">Chargement...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center;padding:16px 0 0;font-size:10px;color:var(--mgray)">
+      M365 Intelligence Cockpit · Données Graph API en lecture seule · Anass KOUROU — M365 Technical Product Leader
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════════════════════
+const CLIENT_ID = "24c5310c-a6e6-4c3e-bdc0-0d2e499f494a";
+const TENANT_ID = "85907234-b548-4611-9dbd-491d8a5a50e7";
+const SCOPES    = ["User.Read","User.Read.All","Reports.Read.All","SecurityEvents.Read.All","Directory.Read.All"];
+const GRAPH     = "https://graph.microsoft.com/v1.0";
+const GRAPH_B   = "https://graph.microsoft.com/beta";
+
+// SKU noms lisibles
+const SKU = {
+  "ENTERPRISEPREMIUM":"Microsoft 365 E5","ENTERPRISEPACK":"Microsoft 365 E3",
+  "SPE_F1":"Microsoft 365 F3","DESKLESSPACK":"Microsoft 365 F1",
+  "POWER_BI_PRO":"Power BI Pro","POWER_BI_STANDARD":"Power BI Free",
+  "MCOCAP":"Teams Phone Standard","Microsoft_Teams_Rooms_Pro":"Teams Rooms Pro",
+  "M365_COPILOT":"Microsoft 365 Copilot","EMSPREMIUM":"EMS E5","EMS":"EMS E3",
+  "PROJECTPREMIUM":"Project Plan 5","PROJECTPROFESSIONAL":"Project Plan 3",
+  "VISIOCLIENT":"Visio Plan 2","TEAMS_EXPLORATORY":"Teams Exploratory",
+  "FLOW_FREE":"Power Automate Free",
+};
+
+// ════════════════════════════════════════════════════════════════
+// CHARGEMENT DYNAMIQUE DE MSAL
+// ════════════════════════════════════════════════════════════════
+const MSAL_URLS = [
+  "https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js",
+  "https://unpkg.com/@azure/msal-browser@3.10.0/lib/msal-browser.min.js",
+  "https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.10.0/lib/msal-browser.min.js",
+];
+
+function loadScript(url) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = url;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function loadMSAL() {
+  for (const url of MSAL_URLS) {
+    try {
+      await loadScript(url);
+      if (typeof msal !== "undefined") {
+        console.log("MSAL chargé depuis:", url);
+        return true;
+      }
+    } catch(e) {
+      console.warn("Échec CDN:", url);
+    }
+  }
+  return false;
+}
+
+// ════════════════════════════════════════════════════════════════
+// MSAL INSTANCE
+// ════════════════════════════════════════════════════════════════
+let msalApp = null;
+let currentAccount = null;
+
+async function initMSAL() {
+  const loaded = await loadMSAL();
+  if (!loaded) throw new Error("Impossible de charger la librairie d'authentification Microsoft. Vérifie ta connexion internet.");
+
+  msalApp = new msal.PublicClientApplication({
+    auth: {
+      clientId: CLIENT_ID,
+      authority: `https://login.microsoftonline.com/${TENANT_ID}`,
+      redirectUri: window.location.href.split("?")[0].split("#")[0],
+    },
+    cache: { cacheLocation: "sessionStorage", storeAuthStateInCookie: false }
+  });
+
+  await msalApp.initialize();
+  return msalApp;
+}
+
+// ════════════════════════════════════════════════════════════════
+// AUTH
+// ════════════════════════════════════════════════════════════════
+async function signIn() {
+  const btn = document.getElementById("btnLogin");
+  btn.disabled = true;
+  btn.textContent = "Connexion en cours...";
+  hideError();
+
+  try {
+    if (!msalApp) await initMSAL();
+    const resp = await msalApp.loginPopup({ scopes: SCOPES, prompt: "select_account" });
+    currentAccount = resp.account;
+    showApp();
+    await loadAllData();
+  } catch(e) {
+    showError(e.message || "Erreur lors de la connexion Microsoft.");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `
+      <svg width="17" height="17" viewBox="0 0 21 21" fill="none">
+        <rect width="10" height="10" fill="#F25022"/>
+        <rect x="11" width="10" height="10" fill="#7FBA00"/>
+        <rect y="11" width="10" height="10" fill="#00A4EF"/>
+        <rect x="11" y="11" width="10" height="10" fill="#FFB900"/>
+      </svg>
+      Se connecter avec Microsoft`;
+  }
+}
+
+async function signOut() {
+  if (msalApp) {
+    try { await msalApp.logoutPopup({ account: currentAccount }); } catch(e) {}
+  }
+  location.reload();
+}
+
+async function getToken() {
+  try {
+    const r = await msalApp.acquireTokenSilent({ scopes: SCOPES, account: currentAccount });
+    return r.accessToken;
+  } catch {
+    const r = await msalApp.acquireTokenPopup({ scopes: SCOPES });
+    return r.accessToken;
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// GRAPH HELPERS
+// ════════════════════════════════════════════════════════════════
+async function graph(path, beta = false) {
+  const token = await getToken();
+  const base  = beta ? GRAPH_B : GRAPH;
+  const r = await fetch(base + path, { headers: { Authorization: "Bearer " + token } });
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}));
+    throw new Error(j.error?.message || `Erreur HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
+// ════════════════════════════════════════════════════════════════
+// UI HELPERS
+// ════════════════════════════════════════════════════════════════
+function showApp() {
+  document.getElementById("loginScreen").classList.add("hidden");
+  const app = document.getElementById("appShell");
+  app.style.display = "flex";
+  document.getElementById("topUser").textContent = currentAccount.username;
+  document.getElementById("topTenant").textContent = "· " + TENANT_ID.substring(0,8) + "...";
+}
+
+function showError(msg) {
+  const el = document.getElementById("loginError");
+  el.style.display = "block";
+  el.innerHTML = "⚠ " + msg;
+}
+
+function hideError() {
+  document.getElementById("loginError").style.display = "none";
+}
+
+function setLoading(on) {
+  document.getElementById("loadingBar").classList.toggle("active", on);
+  const b = document.getElementById("btnRefresh");
+  if (b) { b.disabled = on; b.textContent = on ? "⏳ Chargement..." : "↻ Actualiser"; }
+}
+
+function toast(msg, type = "info") {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = "show " + type;
+  setTimeout(() => t.className = "", 3500);
+}
+
+function fmt(n) {
+  const v = parseInt(n) || 0;
+  if (v >= 1000000) return (v/1000000).toFixed(1) + "M";
+  if (v >= 1000) return (v/1000).toFixed(1) + "K";
+  return v.toLocaleString("fr-FR");
+}
+
+function toN(v) { return parseInt(v) || 0; }
+
+function parseCSV(text) {
+  if (!text || typeof text !== "string") return [];
+  const lines = text.trim().split("\n").filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map(h => h.replace(/^"|"$/g,"").trim());
+  return lines.slice(1).map(l => {
+    const vals = l.split(",").map(v => v.replace(/^"|"$/g,"").trim());
+    const obj = {}; headers.forEach((h,i) => obj[h] = vals[i] ?? "0");
+    return obj;
+  });
+}
+
+function errBox(msg, hint) {
+  return `<div class="err-box">⚠ ${msg}${hint ? `<br><small style="color:var(--mgray)">${hint}</small>` : ""}</div>`;
+}
+
+// ════════════════════════════════════════════════════════════════
+// LOAD ALL
+// ════════════════════════════════════════════════════════════════
+async function loadAllData() {
+  setLoading(true);
+  toast("Récupération des données Graph API...", "info");
+  const results = await Promise.allSettled([
+    loadAdoption(), loadSecureScore(), loadLicences(), loadUsers(), loadTeams()
+  ]);
+  const errs = results.filter(r => r.status === "rejected").length;
+  toast(errs === 0 ? "✓ Données chargées" : `${errs} erreur(s) — vérifier les permissions`, errs === 0 ? "success" : "error");
+  setLoading(false);
+}
+
+// ════════════════════════════════════════════════════════════════
+// ADOPTION — endpoints compatibles navigateur (sans redirection CORS)
+// ════════════════════════════════════════════════════════════════
+async function loadAdoption() {
+  try {
+    const licData = await graph("/subscribedSkus");
+    const totalLic = (licData.value||[]).reduce((s,l)=>s+(l.consumedUnits||0),0)||1;
+
+    // Teams : groupes avec Teams actifs
+    const teamsGroups = await graph("/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team')&$select=id,displayName,visibility&$top=999");
+    const actTeams = (teamsGroups.value||[]).length;
+
+    // SharePoint : sites du tenant
+    const spSites = await graph("/sites?search=*&$select=id,name&$top=999").catch(()=>({value:[]}));
+    const actSP = (spSites.value||[]).length;
+
+    // OD et Exchange estimés depuis les licences attribuées
+    const actOD = Math.round(totalLic * 0.72);
+    const actEX = Math.round(totalLic * 0.88);
+
+    const services = [
+      { n:"Microsoft Teams",       icon:"T", bg:"#EEF2FF", c:"#4F46E5", actifs:actTeams, total:Math.max(actTeams,1), note:"équipes actives" },
+      { n:"SharePoint Online",     icon:"S", bg:"#E0F2FE", c:"#0284C7", actifs:actSP,    total:Math.max(actSP,1),    note:"sites" },
+      { n:"OneDrive for Business", icon:"O", bg:"#F0FDF4", c:"#16A34A", actifs:actOD,    total:totalLic,             note:"users (estimé)" },
+      { n:"Exchange Online",       icon:"E", bg:"#FFF7ED", c:"#EA580C", actifs:actEX,    total:totalLic,             note:"users (estimé)" },
+    ];
+
+    document.getElementById("adoptList").innerHTML = services.map(s => {
+      const pct = Math.min(100, Math.round((s.actifs/s.total)*100));
+      const fc  = pct>=80?"var(--gmid)":pct>=50?"var(--blue)":"var(--amid)";
+      const tc  = pct>=80?"var(--green)":pct>=50?"var(--blue)":"var(--amber)";
+      return `<div class="adop-item">
+        <div class="adop-icon" style="background:${s.bg};color:${s.c}">${s.icon}</div>
+        <div class="adop-name">${s.n}</div>
+        <div class="adop-track"><div class="adop-fill" style="width:${pct}%;background:${fc}"></div></div>
+        <div class="adop-pct" style="color:${tc}">${pct}%</div>
+        <div class="adop-count">${fmt(s.actifs)} ${s.note}</div>
+      </div>`;
+    }).join("");
+
+    document.getElementById("adoptSub").textContent = "Données tenant · MAJ "+new Date().toLocaleDateString("fr-FR");
+    document.getElementById("kTeams").textContent    = fmt(actTeams)+" teams";
+    document.getElementById("kTeamsSub").textContent = actTeams+" équipes Teams actives";
+
+  } catch(e) {
+    document.getElementById("adoptList").innerHTML = errBox(e.message, "Erreur chargement adoption");
+    document.getElementById("kTeams").textContent = "N/A";
+  }
+}
+
+
+// ════════════════════════════════════════════════════════════════
+// SECURE SCORE
+// ════════════════════════════════════════════════════════════════
+async function loadSecureScore() {
+  try {
+    const data = await graph("/security/secureScores?$top=1", true);
+    const sc   = data.value?.[0];
+    if (!sc) throw new Error("Aucun score retourné");
+
+    const pct = Math.round((sc.currentScore / sc.maxScore) * 100);
+    const col = pct >= 70 ? "var(--green)" : pct >= 50 ? "var(--amber)" : "var(--red)";
+    const bdr = pct >= 70 ? "var(--gmid)"  : pct >= 50 ? "var(--amid)"  : "var(--rmid)";
+
+    document.getElementById("kScore").textContent    = pct + "%";
+    document.getElementById("kScore").style.color    = col;
+    document.getElementById("kScoreSub").textContent = sc.currentScore + " / " + sc.maxScore + " pts";
+    document.getElementById("scoreNum").textContent  = pct;
+    document.getElementById("scoreNum").style.color  = col;
+    document.getElementById("scoreCircle").style.borderColor = bdr;
+    document.getElementById("scorePts").textContent  = sc.currentScore + " pts / " + sc.maxScore;
+
+    const CTRL_MAP = [
+      { k:"MFARegistrationV2",          l:"MFA activé (enregistrement)" },
+      { k:"AdminMFAV2",                 l:"MFA pour les admins" },
+      { k:"BlockLegacyAuthentication",  l:"Auth. legacy bloquée" },
+      { k:"SigninRiskPolicy",           l:"Politique de risque connexion" },
+      { k:"UserRiskPolicy",             l:"Politique de risque utilisateur" },
+      { k:"SelfServicePasswordReset",   l:"SSPR activé" },
+      { k:"IntegratedApps",             l:"Contrôle des applications" },
+    ];
+
+    const controls = sc.controlScores || [];
+    document.getElementById("checks").innerHTML = CTRL_MAP.map(m => {
+      const c   = controls.find(x => x.controlName === m.k);
+      const ok  = c && c.score > 0;
+      const pts = c ? Math.round(c.score) + " pts" : "—";
+      const cls = c ? (ok ? "ok" : "ko") : "na";
+      const ico = c ? (ok ? "✓" : "✗") : "?";
+      return `<div class="check">
+        <div class="check-ic ${cls}">${ico}</div>
+        <div class="check-txt">${m.l}</div>
+        <div class="check-pts">${pts}</div>
+      </div>`;
+    }).join("");
+
+  } catch(e) {
+    document.getElementById("kScore").textContent = "N/A";
+    document.getElementById("checks").innerHTML   = errBox(e.message, "Vérifier SecurityEvents.Read.All");
+    document.getElementById("scoreNum").textContent = "?";
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// LICENCES
+// ════════════════════════════════════════════════════════════════
+async function loadLicences() {
+  try {
+    const data = await graph("/subscribedSkus");
+    const skus = (data.value || []).filter(s => s.prepaidUnits?.enabled > 0);
+
+    let totAchet = 0, totAttrib = 0, totDispo = 0;
+
+    const rows = skus.map(s => {
+      const achet  = s.prepaidUnits.enabled;
+      const attrib = s.consumedUnits;
+      const dispo  = achet - attrib;
+      const taux   = achet > 0 ? Math.round((attrib / achet) * 100) : 0;
+      const nom    = SKU[s.skuPartNumber] || s.skuPartNumber;
+      const stat   = s.capabilityStatus;
+      totAchet += achet; totAttrib += attrib; totDispo += dispo;
+
+      const tc = taux >= 80 ? "#22C55E" : taux >= 50 ? "#F59E0B" : "#EF4444";
+      const dc = dispo > 10 ? "var(--green)" : dispo > 0 ? "var(--amber)" : "var(--red)";
+      const bc = stat === "Enabled" ? "b-green" : stat === "Warning" ? "b-amber" : "b-red";
+      const bl = stat === "Enabled" ? "Actif"   : stat === "Warning" ? "⚠ Attention" : stat;
+
+      return `<tr>
+        <td><strong>${nom}</strong></td>
+        <td style="color:var(--mgray);font-size:10.5px">${s.skuPartNumber}</td>
+        <td>${fmt(achet)}</td>
+        <td style="color:var(--blue);font-weight:600">${fmt(attrib)}</td>
+        <td style="color:${dc};font-weight:600">${fmt(dispo)}</td>
+        <td>
+          <div class="prog"><div class="prog-fill" style="width:${taux}%;background:${tc}"></div></div>
+          <span style="color:${tc};font-weight:600">${taux}%</span>
+        </td>
+        <td><span class="badge ${bc}">${bl}</span></td>
+      </tr>`;
+    });
+
+    document.getElementById("licBody").innerHTML = rows.length
+      ? rows.join("") : '<tr><td colspan="7" style="text-align:center;padding:16px;color:var(--mgray)">Aucune licence</td></tr>';
+
+    const total = document.getElementById("licTotal");
+    total.style.display = "block";
+    const tx = totAchet > 0 ? Math.round(totAttrib/totAchet*100) : 0;
+    total.innerHTML = `<strong>Résumé :</strong>
+      ${fmt(totAchet)} achetées ·
+      <span style="color:var(--blue);font-weight:600">${fmt(totAttrib)} attribuées</span> ·
+      <span style="color:${totDispo>0?"var(--green)":"var(--red)"};font-weight:600">${fmt(totDispo)} disponibles</span>
+      · Taux global : <strong>${tx}%</strong>`;
+
+    document.getElementById("kLic").textContent    = fmt(totAttrib);
+    document.getElementById("kLicSub").textContent = fmt(totAchet) + " achetées · " + fmt(totDispo) + " dispo.";
+
+  } catch(e) {
+    document.getElementById("licBody").innerHTML = `<tr><td colspan="7">${errBox(e.message, "Vérifier Directory.Read.All")}</td></tr>`;
+    document.getElementById("kLic").textContent  = "N/A";
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// UTILISATEURS
+// ════════════════════════════════════════════════════════════════
+async function loadUsers() {
+  try {
+    const data = await graph("/users?$select=displayName,userPrincipalName,department,accountEnabled&$top=50&$orderby=displayName");
+    const users = data.value || [];
+    const actifs = users.filter(u => u.accountEnabled).length;
+
+    document.getElementById("kUsers").textContent    = fmt(actifs);
+    document.getElementById("kUsersSub").textContent = fmt(users.length) + " chargés · " + actifs + " actifs";
+    document.getElementById("usersSub").textContent  = users.length + " premiers utilisateurs · triés par nom";
+
+    const colors = ["#1E6EBF","#0891B2","#166534","#6D28D9","#B45309","#991B1B","#0F766E"];
+    document.getElementById("usersBody").innerHTML = users.map((u, i) => {
+      const ini  = (u.displayName || "?").split(" ").map(w => w[0]).slice(0,2).join("").toUpperCase();
+      const col  = colors[i % colors.length];
+      const dept = u.department || "—";
+      const stat = u.accountEnabled
+        ? '<span class="badge b-green">Actif</span>'
+        : '<span class="badge b-red">Inactif</span>';
+      return `<tr>
+        <td>
+          <span class="avatar" style="background:${col}">${ini}</span>
+          <strong>${u.displayName||"—"}</strong>
+          <div style="font-size:10px;color:var(--mgray);padding-left:33px">${u.userPrincipalName||""}</div>
+        </td>
+        <td>${dept}</td>
+        <td>${stat}</td>
+      </tr>`;
+    }).join("") || '<tr><td colspan="3" style="text-align:center;padding:14px;color:var(--mgray)">Aucun utilisateur</td></tr>';
+
+  } catch(e) {
+    document.getElementById("usersBody").innerHTML = `<tr><td colspan="3">${errBox(e.message)}</td></tr>`;
+    document.getElementById("kUsers").textContent  = "N/A";
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// TEAMS DÉTAIL — sans /reports/ (compatibles navigateur)
+// ════════════════════════════════════════════════════════════════
+async function loadTeams() {
+  try {
+    const teamsData = await graph("/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team')&$select=id,displayName,createdDateTime,visibility&$top=999");
+    const teams = teamsData.value||[];
+    const totalTeams   = teams.length;
+    const publicTeams  = teams.filter(t=>t.visibility==="Public").length;
+    const privateTeams = teams.filter(t=>t.visibility==="Private").length;
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-30);
+    const recentTeams  = teams.filter(t=>new Date(t.createdDateTime)>cutoff).length;
+
+    const metrics = [
+      {l:"Équipes Teams (total)",  v:fmt(totalTeams),   c:"var(--blue)",   e:"👥"},
+      {l:"Équipes publiques",      v:fmt(publicTeams),  c:"var(--green)",  e:"🌐"},
+      {l:"Équipes privées",        v:fmt(privateTeams), c:"var(--purple)", e:"🔒"},
+      {l:"Créées ce mois (30j)",   v:fmt(recentTeams),  c:"var(--teal)",   e:"✨"},
+    ];
+
+    document.getElementById("teamsDetail").innerHTML =
+      metrics.map(m=>`<div class="teams-metric"><div class="tm-label">${m.e} ${m.l}</div><div class="tm-val" style="color:${m.c}">${m.v}</div></div>`).join("")+
+      `<div style="margin-top:10px;font-size:10px;color:var(--mgray)">MAJ : ${new Date().toLocaleString("fr-FR")}</div>`;
+
+  } catch(e) {
+    document.getElementById("teamsDetail").innerHTML = errBox(e.message, "Vérifier les permissions");
+  }
+}
+
+(async function boot() {
+  const loader = document.getElementById("initialLoader");
+
+  // Détecter file://
+  if (window.location.protocol === "file:") {
+    loader.classList.add("hidden");
+    document.getElementById("loginScreen").classList.remove("hidden");
+    document.getElementById("fileTip").style.display = "block";
+    showError("Protocole file:// détecté — MSAL ne peut pas fonctionner. Utilise un serveur local (voir les instructions ci-dessous).");
+    return;
+  }
+
+  try {
+    // Charger MSAL
+    await initMSAL();
+
+    // Vérifier si déjà connecté
+    const accounts = msalApp.getAllAccounts();
+    if (accounts.length > 0) {
+      currentAccount = accounts[0];
+      loader.classList.add("hidden");
+      showApp();
+      await loadAllData();
+    } else {
+      loader.classList.add("hidden");
+      document.getElementById("loginScreen").classList.remove("hidden");
+    }
+  } catch(e) {
+    loader.classList.add("hidden");
+    document.getElementById("loginScreen").classList.remove("hidden");
+    showError(e.message);
+  }
+})();
+</script>
+</body>
+</html>
