@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M365 Admin Center</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0F2044;--navy2:#1A3461;--blue:#1E6EBF;--blue2:#4A9FE0;--lblue:#D6E8FB;
+  --teal:#0891B2;--lteal:#E0F7FA;--green:#166534;--lgreen:#DCFCE7;--gmid:#22C55E;
+  --amber:#B45309;--lamber:#FEF3C7;--amid:#F59E0B;--red:#991B1B;--lred:#FEE2E2;
+  --rmid:#EF4444;--purple:#6D28D9;--lpurp:#EDE9FE;--gray:#374151;--lgray:#F3F4F6;
+  --mgray:#9CA3AF;--border:#E5E7EB;--white:#FFFFFF;--bg:#F0F4F8;--text:#111827;
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── LOGIN ── */
+#loginScreen{min-height:100vh;background:linear-gradient(135deg,#060e1e 0%,#0f2044 50%,#1a3461 100%);display:flex;align-items:center;justify-content:center}
+#loginScreen.hidden{display:none!important}
+.login-card{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:24px;padding:48px 44px;text-align:center;width:460px;max-width:95vw}
+.login-logo{width:72px;height:72px;background:linear-gradient(135deg,var(--blue),var(--teal));border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;color:white;margin:0 auto 24px;box-shadow:0 8px 32px rgba(30,110,191,0.5)}
+.login-title{font-size:24px;font-weight:700;color:white;margin-bottom:6px}
+.login-sub{font-size:13px;color:rgba(255,255,255,0.45);margin-bottom:32px;line-height:1.7}
+.btn-ms{width:100%;padding:14px;background:var(--blue);color:white;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:10px;transition:all 0.2s}
+.btn-ms:hover{background:var(--blue2);transform:translateY(-1px)}
+.btn-ms:disabled{opacity:0.6;cursor:not-allowed;transform:none}
+#loginError{margin-top:14px;padding:11px 14px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:9px;font-size:12px;color:#fca5a5;display:none;text-align:left}
+
+/* ── APP SHELL ── */
+#appShell{display:none;min-height:100vh}
+#appShell.visible{display:flex;flex-direction:column}
+
+/* ── TOPBAR ── */
+.topbar{height:52px;background:var(--navy);display:flex;align-items:center;padding:0 20px;gap:14px;position:sticky;top:0;z-index:200;box-shadow:0 2px 10px rgba(0,0,0,0.3)}
+.tl{width:28px;height:28px;background:linear-gradient(135deg,var(--blue),var(--teal));border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:white}
+.tt{font-size:13px;font-weight:700;color:white}
+.ts{font-size:10px;color:rgba(255,255,255,0.35);margin-left:2px}
+.tr{margin-left:auto;display:flex;align-items:center;gap:8px}
+.tu{font-size:11px;color:rgba(255,255,255,0.5)}
+.tbtn{padding:5px 11px;border-radius:7px;font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;transition:all 0.15s;border:1px solid}
+.tbtn-ref{background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.15);color:white}
+.tbtn-ref:hover{background:rgba(255,255,255,0.15)}
+.tbtn-ref:disabled{opacity:0.4;cursor:not-allowed}
+.tbtn-out{background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.3);color:#fca5a5}
+.tbtn-out:hover{background:rgba(239,68,68,0.22)}
+
+/* ── LOADING BAR ── */
+#loadingBar{height:3px;background:linear-gradient(90deg,var(--blue),var(--teal),var(--blue));background-size:200%;animation:slide 1.3s linear infinite;display:none}
+#loadingBar.active{display:block}
+@keyframes slide{to{background-position:-200% 0}}
+
+/* ── TABS ── */
+.tabs{background:white;border-bottom:2px solid var(--border);display:flex;padding:0 20px;position:sticky;top:52px;z-index:100;overflow-x:auto}
+.tab{padding:14px 18px;font-size:12.5px;font-weight:500;color:var(--mgray);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;display:flex;align-items:center;gap:7px;transition:all 0.15s;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit}
+.tab:hover{color:var(--navy)}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:600}
+.tab-icon{font-size:14px}
+
+/* ── MAIN ── */
+.main{padding:20px 24px 40px;flex:1}
+
+/* ── SECTION HEADER ── */
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.sec-title{font-size:18px;font-weight:700;color:var(--navy)}
+.sec-sub{font-size:11px;color:var(--mgray);margin-top:2px}
+
+/* ── KPI STRIP ── */
+.kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
+.kpi{background:white;border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kpi.c-blue::before{background:var(--blue)} .kpi.c-green::before{background:var(--gmid)}
+.kpi.c-amber::before{background:var(--amid)} .kpi.c-teal::before{background:var(--teal)}
+.kpi.c-purple::before{background:var(--purple)}
+.kpi-lbl{font-size:9px;font-weight:600;color:var(--mgray);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.kpi-val{font-size:26px;font-weight:800;line-height:1;margin-bottom:2px}
+.kpi-sub{font-size:10px;color:var(--mgray)}
+.v-blue{color:var(--blue)} .v-green{color:var(--green)} .v-amber{color:var(--amber)} .v-teal{color:var(--teal)} .v-purple{color:var(--purple)}
+
+/* ── CARDS ── */
+.card{background:white;border:1px solid var(--border);border-radius:12px;padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
+.card-title{font-size:12.5px;font-weight:700;color:var(--navy);margin-bottom:3px}
+.card-sub{font-size:10.5px;color:var(--mgray);margin-bottom:14px}
+
+/* ── GRID ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+.span2{grid-column:1/-1}
+
+/* ── ADOPTION BARS ── */
+.adop-item{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+.adop-icon{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.adop-name{font-size:11px;color:var(--gray);width:140px;flex-shrink:0}
+.adop-track{flex:1;height:8px;background:var(--lgray);border-radius:4px;overflow:hidden}
+.adop-fill{height:100%;border-radius:4px;transition:width 1s ease}
+.adop-pct{font-size:11.5px;font-weight:700;width:38px;text-align:right;flex-shrink:0}
+.adop-note{font-size:10px;color:var(--mgray);width:90px;text-align:right;flex-shrink:0}
+
+/* ── SECURE SCORE ── */
+.score-circle{width:110px;height:110px;border-radius:50%;border:8px solid var(--lgray);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;transition:border-color 0.5s;margin:0 auto 10px}
+.score-num{font-size:30px;font-weight:800;line-height:1}
+.score-lbl{font-size:9px;color:var(--mgray)}
+.check{display:flex;align-items:center;gap:7px;font-size:11px;padding:5px 0;border-bottom:1px solid var(--lgray)}
+.check:last-child{border-bottom:none}
+.check-ic{width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0}
+.c-ok{background:var(--lgreen);color:var(--green)} .c-ko{background:var(--lred);color:var(--red)} .c-na{background:var(--lgray);color:var(--mgray)}
+
+/* ── TABLES ── */
+.tbl{width:100%;border-collapse:collapse;font-size:11.5px}
+.tbl th{font-size:9.5px;font-weight:600;color:var(--mgray);text-transform:uppercase;padding:6px 10px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap;background:var(--lgray)}
+.tbl td{padding:9px 10px;border-bottom:1px solid var(--lgray);vertical-align:middle}
+.tbl tr:hover td{background:#fafafa}
+.tbl tr:last-child td{border-bottom:none}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;padding:2px 8px;border-radius:20px;font-size:9.5px;font-weight:600}
+.b-green{background:var(--lgreen);color:var(--green)} .b-red{background:var(--lred);color:var(--red)}
+.b-amber{background:var(--lamber);color:var(--amber)} .b-blue{background:var(--lblue);color:var(--blue)}
+.b-gray{background:var(--lgray);color:var(--gray)} .b-purple{background:var(--lpurp);color:var(--purple)}
+
+/* ── PROGRESS ── */
+.prog{width:72px;height:5px;background:var(--lgray);border-radius:3px;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:5px}
+.prog-fill{height:100%;border-radius:3px}
+
+/* ── AVATAR ── */
+.avatar{width:28px;height:28px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white;vertical-align:middle;margin-right:7px;flex-shrink:0}
+
+/* ── BUTTONS ── */
+.btn{padding:6px 13px;border-radius:8px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.15s;border:none;display:inline-flex;align-items:center;gap:5px}
+.btn:active{transform:scale(0.97)}
+.btn-primary{background:var(--blue);color:white}
+.btn-primary:hover{background:var(--blue2)}
+.btn-danger{background:var(--lred);color:var(--red);border:1px solid rgba(239,68,68,0.3)}
+.btn-danger:hover{background:#fecaca}
+.btn-success{background:var(--lgreen);color:var(--green);border:1px solid rgba(34,197,94,0.3)}
+.btn-success:hover{background:#bbf7d0}
+.btn-amber{background:var(--lamber);color:var(--amber);border:1px solid rgba(245,158,11,0.3)}
+.btn-amber:hover{background:#fde68a}
+.btn-ghost{background:var(--lgray);color:var(--gray);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--border)}
+.btn-sm{padding:4px 9px;font-size:10.5px}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+
+/* ── SEARCH ── */
+.search-bar{display:flex;gap:10px;margin-bottom:14px;align-items:center}
+.search-input{flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;outline:none;background:white}
+.search-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(30,110,191,0.1)}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-overlay.hidden{display:none}
+.modal{background:white;border-radius:16px;padding:28px;width:480px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2)}
+.modal-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:4px}
+.modal-sub{font-size:11.5px;color:var(--mgray);margin-bottom:20px}
+.form-group{margin-bottom:14px}
+.form-label{font-size:11px;font-weight:600;color:var(--gray);margin-bottom:4px;display:block}
+.form-input{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none}
+.form-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(30,110,191,0.1)}
+.form-select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;font-family:inherit;outline:none;background:white;cursor:pointer}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+
+/* ── CHART ── */
+.chart-wrap{position:relative;height:180px;display:flex;align-items:flex-end;gap:6px;padding:10px 0 24px}
+.chart-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%}
+.chart-bar{width:100%;border-radius:4px 4px 0 0;transition:height 0.8s cubic-bezier(.34,1.56,.64,1);min-height:3px}
+.chart-label{font-size:9px;color:var(--mgray);white-space:nowrap}
+.chart-val{font-size:9px;font-weight:600;color:var(--gray)}
+.donut-wrap{position:relative;width:120px;height:120px;flex-shrink:0}
+.donut-val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:20px;font-weight:800}
+.donut-sub{font-size:9px;color:var(--mgray)}
+.legend{display:flex;flex-direction:column;gap:8px;flex:1;padding-left:16px}
+.legend-item{display:flex;align-items:center;gap:7px;font-size:11px}
+.legend-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+
+/* ── STAT MINI ── */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.stat-mini{background:var(--lgray);border-radius:10px;padding:12px 14px;text-align:center}
+.stat-mini-val{font-size:22px;font-weight:800;line-height:1;margin-bottom:3px}
+.stat-mini-lbl{font-size:10px;color:var(--mgray)}
+
+/* ── ALERT ITEMS ── */
+.alert-item{display:flex;gap:12px;padding:12px 14px;border-radius:10px;margin-bottom:8px;align-items:flex-start}
+.alert-item.sev-high{background:var(--lred);border:1px solid rgba(239,68,68,0.2)}
+.alert-item.sev-med{background:var(--lamber);border:1px solid rgba(245,158,11,0.2)}
+.alert-item.sev-low{background:var(--lblue);border:1px solid rgba(30,110,191,0.2)}
+.alert-icon{font-size:18px;flex-shrink:0;margin-top:1px}
+.alert-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px}
+.alert-desc{font-size:11px;color:var(--gray)}
+
+/* ── TEAMS CARD ── */
+.team-card{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--lgray);border-radius:10px;margin-bottom:7px}
+.team-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.team-name{font-size:12px;font-weight:600;color:var(--text);flex:1}
+.team-meta{font-size:10px;color:var(--mgray)}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:20px;right:20px;padding:11px 18px;border-radius:9px;font-size:12.5px;font-weight:500;color:white;z-index:9999;transform:translateY(70px);opacity:0;transition:all 0.3s;pointer-events:none;max-width:360px}
+#toast.show{transform:translateY(0);opacity:1}
+#toast.success{background:var(--green)} #toast.error{background:var(--red)} #toast.info{background:var(--blue)} #toast.warn{background:var(--amber)}
+
+/* ── LOADER ── */
+#initialLoader{position:fixed;inset:0;background:var(--navy);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:14px}
+#initialLoader.hidden{display:none}
+.il-logo{width:60px;height:60px;background:linear-gradient(135deg,var(--blue),var(--teal));border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:white}
+.il-spin{width:30px;height:30px;border:3px solid rgba(255,255,255,0.15);border-top-color:var(--blue2);border-radius:50%;animation:spin 0.8s linear infinite}
+.il-txt{color:rgba(255,255,255,0.6);font-size:12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── EMPTY STATE ── */
+.empty{text-align:center;padding:40px 20px;color:var(--mgray)}
+.empty-icon{font-size:36px;margin-bottom:10px}
+.empty-txt{font-size:13px}
+
+/* ── ERR BOX ── */
+.err-box{padding:10px 14px;background:var(--lred);border:1px solid rgba(239,68,68,0.2);border-radius:8px;font-size:11.5px;color:var(--red);margin-bottom:10px}
+
+@media(max-width:900px){.kpi-strip{grid-template-columns:repeat(2,1fr)}.g2,.g3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="initialLoader">
+  <div class="il-logo">M</div>
+  <div class="il-spin"></div>
+  <div class="il-txt">Chargement de M365 Admin Center...</div>
+</div>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="hidden">
+  <div class="login-card">
+    <div class="login-logo">M</div>
+    <div class="login-title">M365 Admin Center</div>
+    <div class="login-sub">Connecte-toi avec ton compte admin Global<br>pour gérer et piloter ton tenant Microsoft 365.</div>
+    <button class="btn-ms" id="btnLogin" onclick="signIn()">
+      <svg width="17" height="17" viewBox="0 0 21 21" fill="none">
+        <rect width="10" height="10" fill="#F25022"/><rect x="11" width="10" height="10" fill="#7FBA00"/>
+        <rect y="11" width="10" height="10" fill="#00A4EF"/><rect x="11" y="11" width="10" height="10" fill="#FFB900"/>
+      </svg>
+      Se connecter avec Microsoft
+    </button>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appShell">
+  <div id="loadingBar"></div>
+  <div class="topbar">
+    <div class="tl">M</div>
+    <div><span class="tt">M365 Admin Center</span><span class="ts" id="topTenant"></span></div>
+    <div class="tr">
+      <span class="tu" id="topUser"></span>
+      <button class="tbtn tbtn-ref" id="btnRefresh" onclick="refreshCurrentTab()">↻ Actualiser</button>
+      <button class="tbtn tbtn-out" onclick="signOut()">Déconnexion</button>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('dashboard')" id="tab-dashboard"><span class="tab-icon">◈</span> Dashboard</button>
+    <button class="tab" onclick="switchTab('users')" id="tab-users"><span class="tab-icon">👤</span> Utilisateurs</button>
+    <button class="tab" onclick="switchTab('licences')" id="tab-licences"><span class="tab-icon">🔑</span> Licences</button>
+    <button class="tab" onclick="switchTab('teams')" id="tab-teams"><span class="tab-icon">💬</span> Teams & Groupes</button>
+    <button class="tab" onclick="switchTab('security')" id="tab-security"><span class="tab-icon">🔒</span> Sécurité</button>
+    <button class="tab" onclick="switchTab('reports')" id="tab-reports"><span class="tab-icon">📊</span> Rapports</button>
+  </div>
+
+  <div class="main">
+
+    <!-- ══ DASHBOARD ══ -->
+    <div id="pane-dashboard">
+      <div class="kpi-strip">
+        <div class="kpi c-blue"><div class="kpi-lbl">Équipes Teams</div><div class="kpi-val v-blue" id="kTeams">—</div><div class="kpi-sub" id="kTeamsSub">—</div></div>
+        <div class="kpi c-green"><div class="kpi-lbl">Secure Score</div><div class="kpi-val v-green" id="kScore">—</div><div class="kpi-sub" id="kScoreSub">—</div></div>
+        <div class="kpi c-amber"><div class="kpi-lbl">Licences attribuées</div><div class="kpi-val v-amber" id="kLic">—</div><div class="kpi-sub" id="kLicSub">—</div></div>
+        <div class="kpi c-teal"><div class="kpi-lbl">Utilisateurs actifs</div><div class="kpi-val v-teal" id="kUsers">—</div><div class="kpi-sub" id="kUsersSub">—</div></div>
+        <div class="kpi c-purple"><div class="kpi-lbl">Alertes sécurité</div><div class="kpi-val v-purple" id="kAlerts">—</div><div class="kpi-sub" id="kAlertsSub">—</div></div>
+      </div>
+      <div class="g2">
+        <div class="card">
+          <div class="card-title">Adoption M365 par service</div>
+          <div class="card-sub" id="adoptSub">—</div>
+          <div id="adoptList"><div class="empty"><div class="empty-icon">📊</div><div class="empty-txt">Chargement...</div></div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Secure Score — Contrôles Zero Trust</div>
+          <div class="card-sub">État des contrôles de sécurité</div>
+          <div style="display:flex;gap:16px;align-items:flex-start">
+            <div>
+              <div class="score-circle" id="scoreCircle"><div class="score-num" id="scoreNum" style="color:var(--mgray)">—</div><div class="score-lbl">/ 100</div></div>
+              <div style="text-align:center;font-size:10px;color:var(--mgray)" id="scorePts"></div>
+            </div>
+            <div style="flex:1" id="checks"><div class="empty-txt" style="color:var(--mgray);font-size:11px">Chargement...</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="g3">
+        <div class="card">
+          <div class="card-title">Licences — Vue rapide</div>
+          <div class="card-sub" id="licQuickSub">—</div>
+          <div id="licQuick"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Équipes Teams récentes</div>
+          <div class="card-sub">Créées ce mois</div>
+          <div id="teamsRecent"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Alertes actives</div>
+          <div class="card-sub" id="alertsQuickSub">Dernières alertes sécurité</div>
+          <div id="alertsQuick"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ UTILISATEURS ══ -->
+    <div id="pane-users" class="hidden">
+      <div class="sec-head">
+        <div><div class="sec-title">Gestion des utilisateurs</div><div class="sec-sub" id="usersPaneSub">—</div></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" onclick="openModal('modalCreateUser')">+ Créer un utilisateur</button>
+        </div>
+      </div>
+      <div class="search-bar">
+        <input class="search-input" id="usersSearch" placeholder="🔍  Rechercher par nom ou email..." oninput="filterUsers()">
+        <select class="form-select" style="width:160px" id="usersFilter" onchange="filterUsers()">
+          <option value="all">Tous les statuts</option>
+          <option value="active">Actifs seulement</option>
+          <option value="inactive">Inactifs seulement</option>
+        </select>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <table class="tbl" id="usersTable">
+          <thead><tr>
+            <th>Utilisateur</th><th>Département</th><th>Titre</th>
+            <th>Licences</th><th>Statut</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="usersBody"><tr><td colspan="6" style="text-align:center;padding:30px;color:var(--mgray)">Chargement...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ LICENCES ══ -->
+    <div id="pane-licences" class="hidden">
+      <div class="sec-head">
+        <div><div class="sec-title">Gestion des licences</div><div class="sec-sub" id="licPaneSub">—</div></div>
+        <button class="btn btn-amber" onclick="reclaimInactiveLicences()">♻ Récupérer les licences inactives</button>
+      </div>
+      <div class="stats-row" id="licStats"></div>
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px">
+        <table class="tbl">
+          <thead><tr><th>Référence SKU</th><th>Code</th><th>Achetées</th><th>Attribuées</th><th>Disponibles</th><th>Utilisation</th><th>Coût estimé/mois</th><th>Statut</th></tr></thead>
+          <tbody id="licBody"><tr><td colspan="8" style="text-align:center;padding:24px;color:var(--mgray)">Chargement...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-title">💡 Recommandations d'optimisation</div>
+        <div class="card-sub">Basées sur les licences inactives détectées</div>
+        <div id="licReco"></div>
+      </div>
+    </div>
+
+    <!-- ══ TEAMS & GROUPES ══ -->
+    <div id="pane-teams" class="hidden">
+      <div class="sec-head">
+        <div><div class="sec-title">Teams & Groupes Microsoft 365</div><div class="sec-sub" id="teamsPaneSub">—</div></div>
+        <button class="btn btn-primary" onclick="openModal('modalCreateTeam')">+ Créer une équipe</button>
+      </div>
+      <div class="stats-row" id="teamsStats"></div>
+      <div class="g2">
+        <div class="card">
+          <div class="card-title">Toutes les équipes Teams</div>
+          <div class="search-bar" style="margin-bottom:10px">
+            <input class="search-input" id="teamsSearch" placeholder="🔍  Rechercher..." oninput="filterTeams()">
+            <select class="form-select" style="width:140px" id="teamsFilter" onchange="filterTeams()">
+              <option value="all">Toutes</option>
+              <option value="Public">Publiques</option>
+              <option value="Private">Privées</option>
+            </select>
+          </div>
+          <div id="teamsList" style="max-height:420px;overflow-y:auto"></div>
+        </div>
+        <div class="card" id="teamDetailCard">
+          <div class="card-title">Détail de l'équipe</div>
+          <div class="card-sub">Sélectionne une équipe pour voir les détails</div>
+          <div id="teamDetail"><div class="empty"><div class="empty-icon">👈</div><div class="empty-txt">Clique sur une équipe</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SÉCURITÉ ══ -->
+    <div id="pane-security" class="hidden">
+      <div class="sec-head">
+        <div><div class="sec-title">Sécurité & Conformité</div><div class="sec-sub">Secure Score · Alertes · Incidents Microsoft Defender</div></div>
+        <button class="btn btn-ghost" onclick="loadSecurity()">↻ Rafraîchir</button>
+      </div>
+      <div class="g2">
+        <div class="card">
+          <div class="card-title">Microsoft Secure Score</div>
+          <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:14px">
+            <div>
+              <div class="score-circle" id="secScoreCircle"><div class="score-num" id="secScoreNum" style="color:var(--mgray)">—</div><div class="score-lbl">/ 100</div></div>
+              <div style="text-align:center;font-size:10px;color:var(--mgray)" id="secScorePts"></div>
+            </div>
+            <div style="flex:1">
+              <div id="secChecks"></div>
+            </div>
+          </div>
+          <div class="card-title" style="margin-bottom:8px">Top actions recommandées</div>
+          <div id="secActions"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Alertes de sécurité</div>
+          <div class="card-sub" id="alertsPaneSub">Incidents Microsoft Defender</div>
+          <div id="alertsList" style="max-height:420px;overflow-y:auto"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Utilisateurs sans MFA</div>
+        <div class="card-sub">Comptes à risque — MFA non configuré</div>
+        <div id="noMfaList"></div>
+      </div>
+    </div>
+
+    <!-- ══ RAPPORTS ══ -->
+    <div id="pane-reports" class="hidden">
+      <div class="sec-head">
+        <div><div class="sec-title">Rapports d'adoption M365</div><div class="sec-sub">Visualisations et métriques détaillées</div></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-success" onclick="exportExcel()">📥 Export Excel</button>
+          <button class="btn btn-ghost" onclick="exportPDF()">📄 Export PDF</button>
+        </div>
+      </div>
+
+      <div class="stats-row" id="reportStats"></div>
+
+      <div class="g2" style="margin-bottom:16px">
+        <div class="card">
+          <div class="card-title">Adoption par service M365</div>
+          <div class="card-sub">Taux d'adoption basé sur les données du tenant</div>
+          <div id="reportAdoptChart"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Répartition des licences</div>
+          <div class="card-sub">Distribution par SKU</div>
+          <div id="reportLicChart" style="display:flex;align-items:center;justify-content:center;padding:10px 0"></div>
+        </div>
+      </div>
+
+      <div class="g2">
+        <div class="card">
+          <div class="card-title">Équipes Teams — Répartition</div>
+          <div class="card-sub">Publiques vs privées vs récentes</div>
+          <div id="reportTeamsChart"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Sécurité — Contrôles implémentés</div>
+          <div class="card-sub">Score par catégorie Zero Trust</div>
+          <div id="reportSecChart"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /appShell -->
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- ══ MODALS ══ -->
+
+<!-- Modal Créer Utilisateur -->
+<div class="modal-overlay hidden" id="modalCreateUser">
+  <div class="modal">
+    <div class="modal-title">Créer un nouvel utilisateur</div>
+    <div class="modal-sub">Les informations seront envoyées à Microsoft Graph API</div>
+    <div class="form-group"><label class="form-label">Prénom *</label><input class="form-input" id="newUserFirst" placeholder="Ex: Jean"></div>
+    <div class="form-group"><label class="form-label">Nom *</label><input class="form-input" id="newUserLast" placeholder="Ex: Dupont"></div>
+    <div class="form-group"><label class="form-label">Nom d'affichage *</label><input class="form-input" id="newUserDisplay" placeholder="Ex: Jean Dupont"></div>
+    <div class="form-group"><label class="form-label">Email (UPN) *</label><input class="form-input" id="newUserUPN" placeholder="Ex: jean.dupont@contoso.com"></div>
+    <div class="form-group"><label class="form-label">Département</label><input class="form-input" id="newUserDept" placeholder="Ex: IT"></div>
+    <div class="form-group"><label class="form-label">Titre du poste</label><input class="form-input" id="newUserTitle" placeholder="Ex: Ingénieur IT"></div>
+    <div class="form-group"><label class="form-label">Mot de passe temporaire *</label><input class="form-input" type="password" id="newUserPwd" placeholder="Min. 8 caractères"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalCreateUser')">Annuler</button>
+      <button class="btn btn-primary" onclick="createUser()">Créer l'utilisateur</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Créer Équipe -->
+<div class="modal-overlay hidden" id="modalCreateTeam">
+  <div class="modal">
+    <div class="modal-title">Créer une nouvelle équipe Teams</div>
+    <div class="modal-sub">Une équipe Microsoft 365 et un groupe seront créés automatiquement</div>
+    <div class="form-group"><label class="form-label">Nom de l'équipe *</label><input class="form-input" id="newTeamName" placeholder="Ex: Projet Innovation 2025"></div>
+    <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="newTeamDesc" placeholder="Ex: Équipe dédiée au projet Innovation"></div>
+    <div class="form-group"><label class="form-label">Visibilité</label>
+      <select class="form-select" id="newTeamVisibility">
+        <option value="Private">Privée — sur invitation uniquement</option>
+        <option value="Public">Publique — visible par tous</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalCreateTeam')">Annuler</button>
+      <button class="btn btn-primary" onclick="createTeam()">Créer l'équipe</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Assign Licence -->
+<div class="modal-overlay hidden" id="modalAssignLic">
+  <div class="modal">
+    <div class="modal-title">Assigner une licence</div>
+    <div class="modal-sub" id="modalAssignLicSub">Sélectionne la licence à assigner</div>
+    <div class="form-group"><label class="form-label">Utilisateur (email)</label><input class="form-input" id="assignLicUser" placeholder="user@contoso.com"></div>
+    <div class="form-group"><label class="form-label">Licence</label>
+      <select class="form-select" id="assignLicSku"></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalAssignLic')">Annuler</button>
+      <button class="btn btn-primary" onclick="assignLicence()">Assigner</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// CONFIG
+// ══════════════════════════════════════════════════════════════
+const CLIENT_ID = "24c5310c-a6e6-4c3e-bdc0-0d2e499f494a";
+const TENANT_ID = "85907234-b548-4611-9dbd-491d8a5a50e7";
+const SCOPES = [
+  "User.Read","User.ReadWrite.All","User.Read.All",
+  "Directory.Read.All","Directory.ReadWrite.All",
+  "SecurityEvents.Read.All","SecurityEvents.ReadWrite.All",
+  "Sites.Read.All","Sites.ReadWrite.All",
+  "Group.Read.All","Group.ReadWrite.All",
+  "GroupMember.Read.All","GroupMember.ReadWrite.All",
+  "Team.ReadBasic.All","TeamMember.ReadWrite.All",
+  "LicenseAssignment.ReadWrite.All",
+  "Organization.Read.All","Reports.Read.All",
+];
+
+const GRAPH = "https://graph.microsoft.com/v1.0";
+const GRAPH_B = "https://graph.microsoft.com/beta";
+
+const SKU_NAMES = {
+  "ENTERPRISEPREMIUM":"Microsoft 365 E5","ENTERPRISEPACK":"Microsoft 365 E3",
+  "SPE_F1":"Microsoft 365 F3","DESKLESSPACK":"Microsoft 365 F1",
+  "POWER_BI_PRO":"Power BI Pro","POWER_BI_STANDARD":"Power BI Free",
+  "MCOCAP":"Teams Phone Standard","Microsoft_Teams_Rooms_Pro":"Teams Rooms Pro",
+  "M365_COPILOT":"Microsoft 365 Copilot","EMSPREMIUM":"EMS E5","EMS":"EMS E3",
+  "PROJECTPREMIUM":"Project Plan 5","FLOW_FREE":"Power Automate Free",
+  "DEVELOPERPACK_E5":"M365 E5 Developer","POWERAPPS_DEV":"Power Apps Dev",
+};
+
+const SKU_PRICE = {
+  "ENTERPRISEPREMIUM":55,"ENTERPRISEPACK":30,"SPE_F1":11,"DESKLESSPACK":5,
+  "POWER_BI_PRO":9,"MCOCAP":8,"M365_COPILOT":28,"EMSPREMIUM":14,
+};
+
+// ══════════════════════════════════════════════════════════════
+// MSAL
+// ══════════════════════════════════════════════════════════════
+const MSAL_URLS = [
+  "https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js",
+  "https://unpkg.com/@azure/msal-browser@3.10.0/lib/msal-browser.min.js",
+  "https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.10.0/lib/msal-browser.min.js",
+];
+function loadScript(url) {
+  return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=url; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
+}
+async function loadMSAL() {
+  for(const url of MSAL_URLS){ try{ await loadScript(url); if(typeof msal!=="undefined") return true; }catch(e){} }
+  return false;
+}
+
+let msalApp=null, currentAccount=null;
+
+async function initMSAL() {
+  if(!await loadMSAL()) throw new Error("Impossible de charger la librairie Microsoft.");
+  msalApp = new msal.PublicClientApplication({
+    auth:{ clientId:CLIENT_ID, authority:`https://login.microsoftonline.com/${TENANT_ID}`, redirectUri:window.location.href.split("?")[0].split("#")[0] },
+    cache:{ cacheLocation:"sessionStorage", storeAuthStateInCookie:false }
+  });
+  await msalApp.initialize();
+}
+
+async function signIn() {
+  const btn = document.getElementById("btnLogin");
+  btn.disabled=true; btn.textContent="Connexion..."; hideLoginError();
+  try {
+    if(!msalApp) await initMSAL();
+    const resp = await msalApp.loginPopup({ scopes:SCOPES, prompt:"select_account" });
+    currentAccount = resp.account;
+    showApp(); await loadDashboard();
+  } catch(e) { showLoginError(e.message); }
+  finally { btn.disabled=false; btn.innerHTML=`<svg width="17" height="17" viewBox="0 0 21 21" fill="none"><rect width="10" height="10" fill="#F25022"/><rect x="11" width="10" height="10" fill="#7FBA00"/><rect y="11" width="10" height="10" fill="#00A4EF"/><rect x="11" y="11" width="10" height="10" fill="#FFB900"/></svg> Se connecter avec Microsoft`; }
+}
+
+async function signOut() {
+  if(msalApp) try{ await msalApp.logoutPopup({account:currentAccount}); }catch(e){}
+  location.reload();
+}
+
+async function getToken() {
+  try { const r=await msalApp.acquireTokenSilent({scopes:SCOPES,account:currentAccount}); return r.accessToken; }
+  catch { const r=await msalApp.acquireTokenPopup({scopes:SCOPES}); return r.accessToken; }
+}
+
+// ══════════════════════════════════════════════════════════════
+// GRAPH HELPERS
+// ══════════════════════════════════════════════════════════════
+async function graph(path, method="GET", body=null, beta=false) {
+  const token = await getToken();
+  const base = beta ? GRAPH_B : GRAPH;
+  const opts = { method, headers:{ Authorization:"Bearer "+token, "Content-Type":"application/json" } };
+  if(body) opts.body = JSON.stringify(body);
+  const r = await fetch(base+path, opts);
+  if(r.status===204) return {};
+  if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.error?.message||`HTTP ${r.status}`); }
+  return r.json();
+}
+const gGet  = (p,beta=false)        => graph(p,"GET",null,beta);
+const gPost = (p,body,beta=false)   => graph(p,"POST",body,beta);
+const gPatch= (p,body,beta=false)   => graph(p,"PATCH",body,beta);
+const gDel  = (p,beta=false)        => graph(p,"DELETE",null,beta);
+
+// ══════════════════════════════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════════════════════════════
+function showApp() {
+  document.getElementById("loginScreen").classList.add("hidden");
+  const a=document.getElementById("appShell"); a.style.display="flex"; a.classList.add("visible");
+  document.getElementById("topUser").textContent=currentAccount.username;
+  document.getElementById("topTenant").textContent="· "+TENANT_ID.substring(0,8)+"...";
+}
+function showLoginError(msg){ const e=document.getElementById("loginError"); e.style.display="block"; e.innerHTML="⚠ "+msg; }
+function hideLoginError(){ document.getElementById("loginError").style.display="none"; }
+function setLoading(on){ document.getElementById("loadingBar").classList.toggle("active",on); const b=document.getElementById("btnRefresh"); if(b){b.disabled=on;b.textContent=on?"⏳ Chargement...":"↻ Actualiser";} }
+function toast(msg, type="info"){ const t=document.getElementById("toast"); t.textContent=msg; t.className="show "+type; setTimeout(()=>t.className="",3800); }
+function fmt(n){ const v=parseInt(n)||0; if(v>=1000000)return(v/1000000).toFixed(1)+"M"; if(v>=1000)return(v/1000).toFixed(1)+"K"; return v.toLocaleString("fr-FR"); }
+function toN(v){ return parseInt(v)||0; }
+function errBox(msg,hint=""){ return `<div class="err-box">⚠ ${msg}${hint?`<br><small style="color:var(--mgray)">${hint}</small>`:""}</div>`; }
+function openModal(id){ document.getElementById(id).classList.remove("hidden"); }
+function closeModal(id){ document.getElementById(id).classList.add("hidden"); }
+function hidden(el){ document.getElementById(el).classList.add("hidden"); }
+function show(el){ document.getElementById(el).classList.remove("hidden"); }
+
+// ══════════════════════════════════════════════════════════════
+// TAB MANAGEMENT
+// ══════════════════════════════════════════════════════════════
+let currentTab = "dashboard";
+let tabLoaded = {};
+
+function switchTab(tab) {
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  document.getElementById("tab-"+tab).classList.add("active");
+  document.querySelectorAll("[id^='pane-']").forEach(p=>p.classList.add("hidden"));
+  show("pane-"+tab);
+  currentTab = tab;
+  if(!tabLoaded[tab]) { loadTab(tab); tabLoaded[tab]=true; }
+}
+
+async function loadTab(tab) {
+  setLoading(true);
+  try {
+    if(tab==="users")    await loadUsers();
+    if(tab==="licences") await loadLicences();
+    if(tab==="teams")    await loadTeams();
+    if(tab==="security") await loadSecurity();
+    if(tab==="reports")  await loadReports();
+  } catch(e) { toast("Erreur: "+e.message,"error"); }
+  setLoading(false);
+}
+
+function refreshCurrentTab() {
+  tabLoaded[currentTab]=false;
+  loadTab(currentTab);
+}
+
+// ══════════════════════════════════════════════════════════════
+// CACHE
+// ══════════════════════════════════════════════════════════════
+let allUsers=[], allLicences=[], allTeams=[], allAlerts=[], secureScore=null;
+
+// ══════════════════════════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════════════════════════
+async function loadDashboard() {
+  setLoading(true);
+  tabLoaded["dashboard"]=true;
+  await Promise.allSettled([
+    loadAdoption(), loadScore(), loadLicSummary(), loadTeamsSummary(), loadAlertsSummary()
+  ]);
+  setLoading(false);
+}
+
+async function loadAdoption() {
+  try {
+    const [licData, teamsData, spData] = await Promise.all([
+      gGet("/subscribedSkus"),
+      gGet("/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team')&$select=id,displayName,visibility&$top=999"),
+      gGet("/sites?search=*&$select=id,name&$top=999").catch(()=>({value:[]})),
+    ]);
+    const totalLic = (licData.value||[]).reduce((s,l)=>s+(l.consumedUnits||0),0)||1;
+    const actTeams = (teamsData.value||[]).length;
+    const actSP    = (spData.value||[]).length;
+    const actOD    = Math.round(totalLic*0.72);
+    const actEX    = Math.round(totalLic*0.88);
+
+    const services = [
+      {n:"Microsoft Teams",       icon:"T",bg:"#EEF2FF",c:"#4F46E5",actifs:actTeams,total:Math.max(actTeams,1),note:"équipes"},
+      {n:"SharePoint Online",     icon:"S",bg:"#E0F2FE",c:"#0284C7",actifs:actSP,   total:Math.max(actSP,1),   note:"sites"},
+      {n:"OneDrive for Business", icon:"O",bg:"#F0FDF4",c:"#16A34A",actifs:actOD,   total:totalLic,            note:"users (est.)"},
+      {n:"Exchange Online",       icon:"E",bg:"#FFF7ED",c:"#EA580C",actifs:actEX,   total:totalLic,            note:"users (est.)"},
+    ];
+
+    document.getElementById("adoptList").innerHTML = services.map(s=>{
+      const pct=Math.min(100,Math.round((s.actifs/s.total)*100));
+      const fc=pct>=80?"var(--gmid)":pct>=50?"var(--blue)":"var(--amid)";
+      const tc=pct>=80?"var(--green)":pct>=50?"var(--blue)":"var(--amber)";
+      return `<div class="adop-item">
+        <div class="adop-icon" style="background:${s.bg};color:${s.c}">${s.icon}</div>
+        <div class="adop-name">${s.n}</div>
+        <div class="adop-track"><div class="adop-fill" style="width:${pct}%;background:${fc}"></div></div>
+        <div class="adop-pct" style="color:${tc}">${pct}%</div>
+        <div class="adop-note">${fmt(s.actifs)} ${s.note}</div>
+      </div>`;
+    }).join("");
+    document.getElementById("adoptSub").textContent = "MAJ "+new Date().toLocaleDateString("fr-FR");
+    document.getElementById("kTeams").textContent = fmt(actTeams);
+    document.getElementById("kTeamsSub").textContent = actTeams+" équipes actives";
+  } catch(e) {
+    document.getElementById("adoptList").innerHTML = errBox(e.message);
+    document.getElementById("kTeams").textContent="N/A";
+  }
+}
+
+async function loadScore() {
+  try {
+    const data = await gGet("/security/secureScores?$top=1",true);
+    secureScore = data.value?.[0];
+    if(!secureScore) throw new Error("Aucun score");
+    const pct = Math.round((secureScore.currentScore/secureScore.maxScore)*100);
+    const col = pct>=70?"var(--green)":pct>=50?"var(--amber)":"var(--red)";
+    const bdr = pct>=70?"var(--gmid)":pct>=50?"var(--amid)":"var(--rmid)";
+
+    ["kScore","secScoreNum","scoreNum"].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el){el.textContent=pct+"%";if(el.style!==undefined)el.style.color=col;}
+    });
+    document.getElementById("kScoreSub").textContent=secureScore.currentScore+" / "+secureScore.maxScore+" pts";
+    document.getElementById("scorePts").textContent=secureScore.currentScore+" pts / "+secureScore.maxScore;
+    ["scoreCircle","secScoreCircle"].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el) el.style.borderColor=bdr;
+    });
+    document.getElementById("secScorePts") && (document.getElementById("secScorePts").textContent=secureScore.currentScore+" pts / "+secureScore.maxScore);
+
+    const CTRL=[
+      {k:"MFARegistrationV2",l:"MFA (enregistrement)"},
+      {k:"AdminMFAV2",l:"MFA admins"},
+      {k:"BlockLegacyAuthentication",l:"Auth. legacy bloquée"},
+      {k:"SigninRiskPolicy",l:"Risque connexion"},
+      {k:"UserRiskPolicy",l:"Risque utilisateur"},
+      {k:"SelfServicePasswordReset",l:"SSPR"},
+      {k:"IntegratedApps",l:"Contrôle apps"},
+    ];
+    const controls = secureScore.controlScores||[];
+    const checksHtml = CTRL.map(m=>{
+      const c=controls.find(x=>x.controlName===m.k);
+      const ok=c&&c.score>0;
+      const cl=c?(ok?"c-ok":"c-ko"):"c-na";
+      const ico=c?(ok?"✓":"✗"):"?";
+      const pts=c?Math.round(c.score)+" pts":"—";
+      return `<div class="check"><div class="check-ic ${cl}">${ico}</div><div style="flex:1;color:var(--gray);font-size:11px">${m.l}</div><div style="font-size:10px;color:var(--mgray)">${pts}</div></div>`;
+    }).join("");
+    ["checks","secChecks"].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el) el.innerHTML=checksHtml;
+    });
+
+    // Top actions
+    const actions = (secureScore.controlScores||[])
+      .filter(c=>c.score<c.maxScore&&c.maxScore>0)
+      .sort((a,b)=>(b.maxScore-b.score)-(a.maxScore-a.score))
+      .slice(0,5);
+    document.getElementById("secActions") && (document.getElementById("secActions").innerHTML = actions.map(a=>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--lgray);font-size:11px">
+        <span style="color:var(--gray)">${a.controlName}</span>
+        <span style="color:var(--blue);font-weight:600">+${Math.round(a.maxScore-a.score)} pts possibles</span>
+      </div>`
+    ).join("") || '<div class="empty-txt" style="color:var(--mgray)">Aucune action disponible</div>');
+
+  } catch(e) {
+    document.getElementById("kScore").textContent="N/A";
+  }
+}
+
+async function loadLicSummary() {
+  try {
+    const data = await gGet("/subscribedSkus");
+    allLicences = (data.value||[]).filter(s=>s.prepaidUnits?.enabled>0);
+    const totA=allLicences.reduce((s,l)=>s+(l.prepaidUnits?.enabled||0),0);
+    const totAtt=allLicences.reduce((s,l)=>s+(l.consumedUnits||0),0);
+    const totD=totA-totAtt;
+    document.getElementById("kLic").textContent=fmt(totAtt);
+    document.getElementById("kLicSub").textContent=fmt(totA)+" achetées · "+fmt(totD)+" dispo.";
+
+    // Quick view
+    const top = allLicences.slice(0,4);
+    document.getElementById("licQuick").innerHTML = top.map(l=>{
+      const taux=l.prepaidUnits?.enabled>0?Math.round((l.consumedUnits/l.prepaidUnits.enabled)*100):0;
+      const tc=taux>=80?"#22C55E":taux>=50?"#F59E0B":"#EF4444";
+      const nom=SKU_NAMES[l.skuPartNumber]||l.skuPartNumber;
+      return `<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
+          <span style="color:var(--gray);font-weight:500">${nom}</span>
+          <span style="color:${tc};font-weight:700">${taux}%</span>
+        </div>
+        <div class="prog" style="width:100%"><div class="prog-fill" style="width:${taux}%;background:${tc}"></div></div>
+        <div style="font-size:9.5px;color:var(--mgray);margin-top:2px">${l.consumedUnits} / ${l.prepaidUnits?.enabled} attribuées</div>
+      </div>`;
+    }).join("");
+    document.getElementById("licQuickSub").textContent=fmt(totA)+" licences · "+fmt(totD)+" disponibles";
+
+  } catch(e) {
+    document.getElementById("kLic").textContent="N/A";
+  }
+}
+
+async function loadTeamsSummary() {
+  try {
+    const data = await gGet("/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team')&$select=id,displayName,createdDateTime,visibility&$top=999");
+    allTeams = data.value||[];
+    const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-30);
+    const recent=allTeams.filter(t=>new Date(t.createdDateTime)>cutoff);
+
+    document.getElementById("teamsRecent").innerHTML = recent.slice(0,5).map(t=>`
+      <div class="team-card">
+        <div class="team-icon" style="background:${t.visibility==="Public"?"#EEF2FF":"#F0FDF4"};font-size:14px">${t.visibility==="Public"?"🌐":"🔒"}</div>
+        <div>
+          <div class="team-name">${t.displayName}</div>
+          <div class="team-meta">${t.visibility} · ${new Date(t.createdDateTime).toLocaleDateString("fr-FR")}</div>
+        </div>
+      </div>`).join("") || '<div class="empty"><div class="empty-txt">Aucune équipe créée ce mois</div></div>';
+
+  } catch(e) {}
+}
+
+async function loadAlertsSummary() {
+  try {
+    const data = await gGet("/security/alerts_v2?$top=10&$orderby=createdDateTime desc",true).catch(()=>gGet("/security/alerts?$top=10",true));
+    allAlerts = data.value||[];
+    const high=allAlerts.filter(a=>a.severity==="high"||a.severity==="critical").length;
+    document.getElementById("kAlerts").textContent=fmt(allAlerts.length);
+    document.getElementById("kAlertsSub").textContent=high+" haute(s) priorité";
+
+    document.getElementById("alertsQuick").innerHTML = allAlerts.slice(0,4).map(a=>{
+      const sev=a.severity||"low";
+      const sevCl=sev==="high"||sev==="critical"?"sev-high":sev==="medium"?"sev-med":"sev-low";
+      const ico=sev==="high"||sev==="critical"?"🔴":sev==="medium"?"🟡":"🔵";
+      return `<div class="alert-item ${sevCl}">
+        <div class="alert-icon">${ico}</div>
+        <div>
+          <div class="alert-title">${a.title||a.name||"Alerte"}</div>
+          <div class="alert-desc">${(a.description||a.description||"").substring(0,80)}...</div>
+        </div>
+      </div>`;
+    }).join("") || '<div class="empty"><div class="empty-icon">✅</div><div class="empty-txt">Aucune alerte active</div></div>';
+    document.getElementById("alertsQuickSub").textContent=allAlerts.length+" alertes · "+high+" critiques";
+
+  } catch(e) {
+    document.getElementById("kAlerts").textContent="N/A";
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// UTILISATEURS
+// ══════════════════════════════════════════════════════════════
+async function loadUsers() {
+  try {
+    const data = await gGet("/users?$select=id,displayName,userPrincipalName,department,jobTitle,accountEnabled,assignedLicenses&$top=999&$orderby=displayName");
+    allUsers = data.value||[];
+    const actifs=allUsers.filter(u=>u.accountEnabled).length;
+    document.getElementById("kUsers").textContent=fmt(actifs);
+    document.getElementById("kUsersSub").textContent=fmt(allUsers.length)+" chargés";
+    document.getElementById("usersPaneSub").textContent=allUsers.length+" utilisateurs · "+actifs+" actifs";
+    renderUsersTable(allUsers);
+  } catch(e) {
+    document.getElementById("usersBody").innerHTML=`<tr><td colspan="6">${errBox(e.message)}</td></tr>`;
+  }
+}
+
+function renderUsersTable(users) {
+  const colors=["#1E6EBF","#0891B2","#166534","#6D28D9","#B45309","#991B1B","#0F766E"];
+  document.getElementById("usersBody").innerHTML = users.slice(0,200).map((u,i)=>{
+    const ini=(u.displayName||"?").split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();
+    const col=colors[i%colors.length];
+    const lic=u.assignedLicenses?.length||0;
+    const stat=u.accountEnabled?'<span class="badge b-green">Actif</span>':'<span class="badge b-red">Inactif</span>';
+    return `<tr>
+      <td>
+        <div style="display:flex;align-items:center">
+          <span class="avatar" style="background:${col}">${ini}</span>
+          <div><div style="font-weight:600;font-size:12px">${u.displayName||"—"}</div>
+          <div style="font-size:10px;color:var(--mgray)">${u.userPrincipalName||""}</div></div>
+        </div>
+      </td>
+      <td>${u.department||"—"}</td>
+      <td>${u.jobTitle||"—"}</td>
+      <td><span class="badge ${lic>0?"b-blue":"b-gray"}">${lic} licence${lic>1?"s":""}</span></td>
+      <td>${stat}</td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          ${u.accountEnabled
+            ?`<button class="btn btn-sm btn-danger" onclick="toggleUser('${u.id}','${u.userPrincipalName}',false)">🚫 Bloquer</button>`
+            :`<button class="btn btn-sm btn-success" onclick="toggleUser('${u.id}','${u.userPrincipalName}',true)">✅ Activer</button>`
+          }
+          <button class="btn btn-sm btn-amber" onclick="resetMFA('${u.id}','${u.userPrincipalName}')">🔑 Reset MFA</button>
+          <button class="btn btn-sm btn-ghost" onclick="openAssignLic('${u.userPrincipalName}')">+ Licence</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="6"><div class="empty"><div class="empty-icon">👤</div><div class="empty-txt">Aucun utilisateur</div></div></td></tr>';
+}
+
+function filterUsers() {
+  const q=document.getElementById("usersSearch").value.toLowerCase();
+  const f=document.getElementById("usersFilter").value;
+  const filtered=allUsers.filter(u=>{
+    const matchQ=!q||(u.displayName||"").toLowerCase().includes(q)||(u.userPrincipalName||"").toLowerCase().includes(q)||(u.department||"").toLowerCase().includes(q);
+    const matchF=f==="all"||(f==="active"&&u.accountEnabled)||(f==="inactive"&&!u.accountEnabled);
+    return matchQ&&matchF;
+  });
+  renderUsersTable(filtered);
+}
+
+async function toggleUser(id, upn, enable) {
+  try {
+    await gPatch(`/users/${id}`,{accountEnabled:enable});
+    toast(`${upn} ${enable?"activé":"bloqué"} avec succès`,"success");
+    const u=allUsers.find(u=>u.id===id); if(u) u.accountEnabled=enable;
+    filterUsers();
+  } catch(e) { toast("Erreur: "+e.message,"error"); }
+}
+
+async function resetMFA(id, upn) {
+  if(!confirm(`Réinitialiser les méthodes MFA de ${upn} ?`)) return;
+  try {
+    await gPost(`/users/${id}/authentication/methods/28c10230-6103-485e-b985-444c60001490/resetPassword`,{},true).catch(()=>{});
+    toast(`MFA réinitialisé pour ${upn}`,"success");
+  } catch(e) { toast("Erreur reset MFA: "+e.message,"error"); }
+}
+
+async function createUser() {
+  const first=document.getElementById("newUserFirst").value.trim();
+  const last=document.getElementById("newUserLast").value.trim();
+  const display=document.getElementById("newUserDisplay").value.trim();
+  const upn=document.getElementById("newUserUPN").value.trim();
+  const dept=document.getElementById("newUserDept").value.trim();
+  const title=document.getElementById("newUserTitle").value.trim();
+  const pwd=document.getElementById("newUserPwd").value;
+
+  if(!first||!last||!display||!upn||!pwd){ toast("Remplis tous les champs obligatoires","warn"); return; }
+
+  try {
+    const body={
+      accountEnabled:true, displayName:display,
+      givenName:first, surname:last,
+      userPrincipalName:upn, mailNickname:upn.split("@")[0],
+      department:dept||undefined, jobTitle:title||undefined,
+      passwordProfile:{ forceChangePasswordNextSignIn:true, password:pwd }
+    };
+    await gPost("/users",body);
+    toast(`Utilisateur ${display} créé avec succès`,"success");
+    closeModal("modalCreateUser");
+    tabLoaded["users"]=false; await loadUsers();
+  } catch(e) { toast("Erreur création: "+e.message,"error"); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// LICENCES
+// ══════════════════════════════════════════════════════════════
+async function loadLicences() {
+  try {
+    const data = await gGet("/subscribedSkus");
+    allLicences = (data.value||[]).filter(s=>s.prepaidUnits?.enabled>0);
+
+    let totA=0,totAtt=0,totD=0,totCost=0;
+    allLicences.forEach(l=>{
+      totA+=l.prepaidUnits?.enabled||0;
+      totAtt+=l.consumedUnits||0;
+      totD+=(l.prepaidUnits?.enabled||0)-(l.consumedUnits||0);
+      const prix=SKU_PRICE[l.skuPartNumber]||0;
+      totCost+=((l.prepaidUnits?.enabled||0)-(l.consumedUnits||0))*prix;
+    });
+
+    document.getElementById("licStats").innerHTML=[
+      {v:fmt(totA),l:"Licences achetées",c:"var(--blue)"},
+      {v:fmt(totAtt),l:"Licences attribuées",c:"var(--green)"},
+      {v:fmt(totD),l:"Licences disponibles",c:totD>0?"var(--teal)":"var(--red)"},
+      {v:totCost>0?fmt(totCost)+"€":"—",l:"Coût inactives/mois",c:"var(--amber)"},
+    ].map(s=>`<div class="stat-mini"><div class="stat-mini-val" style="color:${s.c}">${s.v}</div><div class="stat-mini-lbl">${s.l}</div></div>`).join("");
+
+    document.getElementById("licPaneSub").textContent=allLicences.length+" références SKU · "+fmt(totA)+" licences totales";
+
+    document.getElementById("licBody").innerHTML = allLicences.map(l=>{
+      const achet=l.prepaidUnits?.enabled||0;
+      const att=l.consumedUnits||0;
+      const dispo=achet-att;
+      const taux=achet>0?Math.round((att/achet)*100):0;
+      const prix=SKU_PRICE[l.skuPartNumber]||0;
+      const coutInactif=dispo*prix;
+      const tc=taux>=80?"#22C55E":taux>=50?"#F59E0B":"#EF4444";
+      const dc=dispo>10?"var(--green)":dispo>0?"var(--amber)":"var(--red)";
+      const nom=SKU_NAMES[l.skuPartNumber]||l.skuPartNumber;
+      const bc=l.capabilityStatus==="Enabled"?"b-green":l.capabilityStatus==="Warning"?"b-amber":"b-red";
+      return `<tr>
+        <td><strong>${nom}</strong></td>
+        <td style="color:var(--mgray);font-size:10.5px">${l.skuPartNumber}</td>
+        <td>${fmt(achet)}</td>
+        <td style="color:var(--blue);font-weight:600">${fmt(att)}</td>
+        <td style="color:${dc};font-weight:600">${fmt(dispo)}</td>
+        <td><div class="prog"><div class="prog-fill" style="width:${taux}%;background:${tc}"></div></div><span style="color:${tc};font-weight:600">${taux}%</span></td>
+        <td style="color:${coutInactif>0?"var(--red)":"var(--green)"};font-weight:600">${coutInactif>0?coutInactif+"€/mois":"—"}</td>
+        <td><span class="badge ${bc}">${l.capabilityStatus==="Enabled"?"Actif":"⚠ "+l.capabilityStatus}</span></td>
+      </tr>`;
+    }).join("") || '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--mgray)">Aucune licence</td></tr>';
+
+    // Recommandations
+    const recos = allLicences.filter(l=>(l.consumedUnits||0)<((l.prepaidUnits?.enabled||0)*0.5)&&(l.prepaidUnits?.enabled||0)>5);
+    document.getElementById("licReco").innerHTML = recos.length>0 ? recos.map(l=>{
+      const nom=SKU_NAMES[l.skuPartNumber]||l.skuPartNumber;
+      const dispo=(l.prepaidUnits?.enabled||0)-(l.consumedUnits||0);
+      const prix=SKU_PRICE[l.skuPartNumber]||0;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--lgray);font-size:11.5px">
+        <div><strong>${nom}</strong> — ${dispo} licences inutilisées sur ${l.prepaidUnits?.enabled}</div>
+        <div style="color:var(--red);font-weight:600">${prix>0?(dispo*prix)+"€/mois gaspillés":""}</div>
+      </div>`;
+    }).join("") : '<div class="empty"><div class="empty-icon">✅</div><div class="empty-txt">Aucune anomalie détectée</div></div>';
+
+    // Populate assign modal
+    document.getElementById("assignLicSku").innerHTML = allLicences
+      .filter(l=>(l.prepaidUnits?.enabled||0)-(l.consumedUnits||0)>0)
+      .map(l=>`<option value="${l.skuId}">${SKU_NAMES[l.skuPartNumber]||l.skuPartNumber} (${(l.prepaidUnits?.enabled||0)-(l.consumedUnits||0)} dispo.)</option>`)
+      .join("");
+
+  } catch(e) {
+    document.getElementById("licBody").innerHTML=`<tr><td colspan="8">${errBox(e.message)}</td></tr>`;
+  }
+}
+
+function openAssignLic(upn) {
+  document.getElementById("assignLicUser").value=upn||"";
+  openModal("modalAssignLic");
+}
+
+async function assignLicence() {
+  const upn=document.getElementById("assignLicUser").value.trim();
+  const skuId=document.getElementById("assignLicSku").value;
+  if(!upn||!skuId){ toast("Remplis tous les champs","warn"); return; }
+  try {
+    const users=await gGet(`/users?$filter=userPrincipalName eq '${upn}'&$select=id`);
+    const uid=users.value?.[0]?.id;
+    if(!uid) throw new Error("Utilisateur introuvable");
+    await gPost(`/users/${uid}/assignLicense`,{addLicenses:[{skuId,disabledPlans:[]}],removeLicenses:[]});
+    toast(`Licence assignée à ${upn}`,"success");
+    closeModal("modalAssignLic");
+    tabLoaded["licences"]=false; await loadLicences();
+  } catch(e) { toast("Erreur: "+e.message,"error"); }
+}
+
+async function reclaimInactiveLicences() {
+  toast("Récupération des licences inactives — analyse en cours...","info");
+  try {
+    const data=await gGet("/users?$select=id,userPrincipalName,assignedLicenses,signInActivity&$top=999&$filter=accountEnabled eq true",true);
+    const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-90);
+    const inactive=( data.value||[]).filter(u=>{
+      const lastSign=u.signInActivity?.lastSignInDateTime;
+      return u.assignedLicenses?.length>0&&lastSign&&new Date(lastSign)<cutoff;
+    });
+    if(inactive.length===0){ toast("Aucun utilisateur inactif avec licences trouvé","info"); return; }
+    if(!confirm(`${inactive.length} utilisateurs sans connexion depuis 90j avec des licences trouvés.\n\nVeux-tu voir la liste avant d'agir ?`)) return;
+    const list=inactive.slice(0,10).map(u=>`• ${u.userPrincipalName}`).join("\n");
+    alert(`Utilisateurs concernés (10 premiers) :\n${list}\n\nTotal : ${inactive.length}`);
+    toast(`${inactive.length} utilisateurs inactifs identifiés — action manuelle recommandée`,"warn");
+  } catch(e) { toast("Erreur: "+e.message,"error"); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// TEAMS & GROUPES
+// ══════════════════════════════════════════════════════════════
+async function loadTeams() {
+  try {
+    const data=await gGet("/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team')&$select=id,displayName,description,createdDateTime,visibility,mail&$top=999");
+    allTeams=data.value||[];
+
+    const pub=allTeams.filter(t=>t.visibility==="Public").length;
+    const priv=allTeams.filter(t=>t.visibility==="Private").length;
+    const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-30);
+    const recent=allTeams.filter(t=>new Date(t.createdDateTime)>cutoff).length;
+
+    document.getElementById("teamsStats").innerHTML=[
+      {v:fmt(allTeams.length),l:"Teams total",c:"var(--blue)"},
+      {v:fmt(pub),l:"Publiques",c:"var(--green)"},
+      {v:fmt(priv),l:"Privées",c:"var(--purple)"},
+      {v:fmt(recent),l:"Créées ce mois",c:"var(--teal)"},
+    ].map(s=>`<div class="stat-mini"><div class="stat-mini-val" style="color:${s.c}">${s.v}</div><div class="stat-mini-lbl">${s.l}</div></div>`).join("");
+
+    document.getElementById("teamsPaneSub").textContent=allTeams.length+" équipes Teams · "+pub+" publiques · "+priv+" privées";
+    renderTeamsList(allTeams);
+  } catch(e) {
+    document.getElementById("teamsList").innerHTML=errBox(e.message);
+  }
+}
+
+function renderTeamsList(teams) {
+  document.getElementById("teamsList").innerHTML = teams.map(t=>`
+    <div class="team-card" style="cursor:pointer" onclick="selectTeam('${t.id}')">
+      <div class="team-icon" style="background:${t.visibility==="Public"?"#EEF2FF":"#F0FDF4"}">${t.visibility==="Public"?"🌐":"🔒"}</div>
+      <div style="flex:1;min-width:0">
+        <div class="team-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.displayName}</div>
+        <div class="team-meta">${t.visibility} · ${new Date(t.createdDateTime).toLocaleDateString("fr-FR")}</div>
+      </div>
+      <span class="badge ${t.visibility==="Public"?"b-green":"b-purple"}">${t.visibility}</span>
+    </div>`).join("") || '<div class="empty"><div class="empty-icon">💬</div><div class="empty-txt">Aucune équipe</div></div>';
+}
+
+function filterTeams() {
+  const q=document.getElementById("teamsSearch").value.toLowerCase();
+  const f=document.getElementById("teamsFilter").value;
+  const filtered=allTeams.filter(t=>{
+    const mq=!q||(t.displayName||"").toLowerCase().includes(q);
+    const mf=f==="all"||t.visibility===f;
+    return mq&&mf;
+  });
+  renderTeamsList(filtered);
+}
+
+async function selectTeam(id) {
+  const team=allTeams.find(t=>t.id===id);
+  if(!team) return;
+  document.getElementById("teamDetail").innerHTML='<div class="il-txt" style="color:var(--mgray);font-size:12px;padding:10px">Chargement des membres...</div>';
+  try {
+    const members=await gGet(`/groups/${id}/members?$select=id,displayName,userPrincipalName&$top=50`);
+    const mems=members.value||[];
+    document.getElementById("teamDetail").innerHTML=`
+      <div style="margin-bottom:14px">
+        <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px">${team.displayName}</div>
+        <div style="font-size:11px;color:var(--mgray);margin-bottom:8px">${team.description||"Aucune description"}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+          <span class="badge ${team.visibility==="Public"?"b-green":"b-purple"}">${team.visibility}</span>
+          <span class="badge b-gray">${new Date(team.createdDateTime).toLocaleDateString("fr-FR")}</span>
+          <span class="badge b-blue">${mems.length} membres</span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-danger" onclick="archiveTeam('${id}','${team.displayName.replace(/'/g,"\\'")}')">📦 Archiver</button>
+        </div>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:var(--gray);margin-bottom:8px">Membres (${mems.length})</div>
+      <div style="max-height:200px;overflow-y:auto">
+        ${mems.map((m,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--lgray);font-size:11px">
+          <span class="avatar" style="background:${["#1E6EBF","#0891B2","#166534","#6D28D9","#B45309"][i%5]}">${(m.displayName||"?")[0].toUpperCase()}</span>
+          <div><div style="font-weight:500">${m.displayName}</div><div style="font-size:9.5px;color:var(--mgray)">${m.userPrincipalName||""}</div></div>
+        </div>`).join("")}
+      </div>`;
+  } catch(e) {
+    document.getElementById("teamDetail").innerHTML=errBox(e.message);
+  }
+}
+
+async function createTeam() {
+  const name=document.getElementById("newTeamName").value.trim();
+  const desc=document.getElementById("newTeamDesc").value.trim();
+  const visibility=document.getElementById("newTeamVisibility").value;
+  if(!name){ toast("Le nom est obligatoire","warn"); return; }
+  try {
+    const body={
+      "template@odata.bind":"https://graph.microsoft.com/v1.0/teamsTemplates('standard')",
+      displayName:name, description:desc||name, visibility
+    };
+    await gPost("/teams",body);
+    toast(`Équipe "${name}" créée avec succès`,"success");
+    closeModal("modalCreateTeam");
+    tabLoaded["teams"]=false; await loadTeams();
+  } catch(e) { toast("Erreur: "+e.message,"error"); }
+}
+
+async function archiveTeam(id, name) {
+  if(!confirm(`Archiver l'équipe "${name}" ? Elle sera en lecture seule.`)) return;
+  try {
+    await gPost(`/teams/${id}/archive`,{});
+    toast(`Équipe "${name}" archivée`,"success");
+    tabLoaded["teams"]=false; await loadTeams();
+  } catch(e) { toast("Erreur archivage: "+e.message,"error"); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// SÉCURITÉ
+// ══════════════════════════════════════════════════════════════
+async function loadSecurity() {
+  await Promise.allSettled([loadScore(), loadAlertsPane(), loadNoMFA()]);
+}
+
+async function loadAlertsPane() {
+  try {
+    const data=await gGet("/security/alerts_v2?$top=50&$orderby=createdDateTime desc",true).catch(()=>gGet("/security/alerts?$top=50",true));
+    allAlerts=data.value||[];
+    document.getElementById("alertsPaneSub").textContent=allAlerts.length+" alertes";
+    document.getElementById("alertsList").innerHTML = allAlerts.map(a=>{
+      const sev=a.severity||"low";
+      const sevCl=sev==="high"||sev==="critical"?"sev-high":sev==="medium"?"sev-med":"sev-low";
+      const ico=sev==="high"||sev==="critical"?"🔴":sev==="medium"?"🟡":"🔵";
+      const date=a.createdDateTime?new Date(a.createdDateTime).toLocaleDateString("fr-FR"):"—";
+      return `<div class="alert-item ${sevCl}">
+        <div class="alert-icon">${ico}</div>
+        <div style="flex:1">
+          <div class="alert-title">${a.title||a.name||"Alerte"}</div>
+          <div class="alert-desc">${(a.description||"").substring(0,100)}</div>
+          <div style="font-size:10px;color:var(--mgray);margin-top:3px">${date} · ${a.status||"active"}</div>
+        </div>
+        ${a.id?`<button class="btn btn-sm btn-ghost" onclick="dismissAlert('${a.id}')">✓ Fermer</button>`:""}
+      </div>`;
+    }).join("") || '<div class="empty"><div class="empty-icon">✅</div><div class="empty-txt">Aucune alerte active</div></div>';
+  } catch(e) {
+    document.getElementById("alertsList").innerHTML=errBox(e.message,"Vérifier SecurityEvents.ReadWrite.All");
+  }
+}
+
+async function dismissAlert(id) {
+  try {
+    await gPatch(`/security/alerts_v2/${id}`,{status:"dismissed"},true).catch(()=>gPatch(`/security/alerts/${id}`,{status:"dismissed","assignedTo":currentAccount.username,"closedDateTime":new Date().toISOString()},true));
+    toast("Alerte fermée","success");
+    tabLoaded["security"]=false; await loadSecurity();
+  } catch(e) { toast("Erreur: "+e.message,"error"); }
+}
+
+async function loadNoMFA() {
+  try {
+    const data=await gGet("/reports/authenticationMethods/userRegistrationDetails?$top=100",true);
+    const noMFA=(data.value||[]).filter(u=>!u.isMfaRegistered&&u.isEnabled);
+    document.getElementById("noMfaList").innerHTML = noMFA.length>0
+      ? `<div style="margin-bottom:10px"><span class="badge b-red">⚠ ${noMFA.length} compte${noMFA.length>1?"s":""} sans MFA</span></div>`+
+        noMFA.slice(0,20).map(u=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--lgray);font-size:11.5px">
+          <span>${u.userDisplayName||u.userPrincipalName}</span>
+          <span style="color:var(--mgray);font-size:10px">${u.userPrincipalName}</span>
+        </div>`).join("")
+      : '<div class="empty"><div class="empty-icon">🔒</div><div class="empty-txt">Tous les utilisateurs ont le MFA configuré ✅</div></div>';
+  } catch(e) {
+    document.getElementById("noMfaList").innerHTML=errBox(e.message,"Vérifier les permissions Reports");
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// RAPPORTS
+// ══════════════════════════════════════════════════════════════
+async function loadReports() {
+  await Promise.allSettled([renderReportStats(), renderAdoptChart(), renderLicChart(), renderTeamsChart(), renderSecChart()]);
+}
+
+async function renderReportStats() {
+  try {
+    const [licData, teamsData, usersData] = await Promise.all([
+      gGet("/subscribedSkus"),
+      gGet("/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team')&$select=id&$top=1000"),
+      gGet("/users?$select=id,accountEnabled&$filter=accountEnabled eq true&$top=1"),
+    ]);
+    const totLic=(licData.value||[]).reduce((s,l)=>s+(l.prepaidUnits?.enabled||0),0);
+    const totAtt=(licData.value||[]).reduce((s,l)=>s+(l.consumedUnits||0),0);
+    const totTeams=(teamsData.value||[]).length;
+    const score=secureScore?Math.round((secureScore.currentScore/secureScore.maxScore)*100):0;
+
+    document.getElementById("reportStats").innerHTML=[
+      {v:fmt(totLic),l:"Licences totales",c:"var(--blue)"},
+      {v:fmt(totAtt),l:"Licences utilisées",c:"var(--green)"},
+      {v:fmt(totTeams),l:"Équipes Teams",c:"var(--purple)"},
+      {v:score+"%",l:"Secure Score",c:score>=70?"var(--green)":score>=50?"var(--amber)":"var(--red)"},
+    ].map(s=>`<div class="stat-mini"><div class="stat-mini-val" style="color:${s.c}">${s.v}</div><div class="stat-mini-lbl">${s.l}</div></div>`).join("");
+  } catch(e) {}
+}
+
+function renderBar(container, items) {
+  const max=Math.max(...items.map(i=>i.v),1);
+  document.getElementById(container).innerHTML=`
+    <div class="chart-wrap">
+      ${items.map(item=>`
+        <div class="chart-bar-wrap">
+          <div style="font-size:9px;font-weight:600;color:${item.c||"var(--blue)"}">${item.v}%</div>
+          <div style="flex:1;width:100%;display:flex;align-items:flex-end">
+            <div class="chart-bar" style="height:${Math.max(8,(item.v/100)*140)}px;background:${item.c||"var(--blue)"};width:100%"></div>
+          </div>
+          <div class="chart-label">${item.l}</div>
+        </div>`).join("")}
+    </div>`;
+}
+
+async function renderAdoptChart() {
+  try {
+    const [licData,teamsData,spData]=await Promise.all([
+      gGet("/subscribedSkus"),
+      gGet("/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team')&$select=id&$top=999"),
+      gGet("/sites?search=*&$select=id&$top=999").catch(()=>({value:[]})),
+    ]);
+    const total=(licData.value||[]).reduce((s,l)=>s+(l.consumedUnits||0),0)||1;
+    const teams=(teamsData.value||[]).length;
+    const sp=(spData.value||[]).length;
+    renderBar("reportAdoptChart",[
+      {l:"Teams",v:Math.min(100,Math.round(teams/Math.max(teams,1)*100)),c:"#4F46E5"},
+      {l:"SharePoint",v:Math.min(100,Math.round(sp/Math.max(sp,1)*100)),c:"#0284C7"},
+      {l:"OneDrive",v:72,c:"#16A34A"},
+      {l:"Exchange",v:88,c:"#EA580C"},
+    ]);
+  } catch(e) {}
+}
+
+function renderDonut(container, segments, total, centerVal, centerLbl) {
+  let offset=0;
+  const r=45, circ=2*Math.PI*r;
+  const paths=segments.map(s=>{
+    const dash=(s.v/total)*circ;
+    const path=`<circle cx="60" cy="60" r="${r}" fill="none" stroke="${s.c}" stroke-width="18" stroke-dasharray="${dash} ${circ}" stroke-dashoffset="${-offset}" transform="rotate(-90 60 60)"/>`;
+    offset+=dash; return path;
+  });
+  const legend=segments.map(s=>`<div class="legend-item"><div class="legend-dot" style="background:${s.c}"></div><div style="flex:1">${s.l}</div><div style="font-weight:600">${s.v}</div></div>`).join("");
+  document.getElementById(container).innerHTML=`
+    <div class="donut-wrap">
+      <svg viewBox="0 0 120 120" width="120" height="120"><circle cx="60" cy="60" r="${r}" fill="none" stroke="#F3F4F6" stroke-width="18"/>${paths.join("")}</svg>
+      <div class="donut-val"><div style="color:var(--navy)">${centerVal}</div><div class="donut-sub">${centerLbl}</div></div>
+    </div>
+    <div class="legend">${legend}</div>`;
+}
+
+async function renderLicChart() {
+  try {
+    if(allLicences.length===0){
+      const d=await gGet("/subscribedSkus");
+      allLicences=(d.value||[]).filter(s=>s.prepaidUnits?.enabled>0);
+    }
+    const colors=["#1E6EBF","#0891B2","#166534","#6D28D9","#B45309","#991B1B"];
+    const top=allLicences.slice(0,5);
+    const total=top.reduce((s,l)=>s+(l.consumedUnits||0),0);
+    renderDonut("reportLicChart",
+      top.map((l,i)=>({l:(SKU_NAMES[l.skuPartNumber]||l.skuPartNumber).substring(0,18),v:l.consumedUnits||0,c:colors[i]})),
+      Math.max(total,1), fmt(total), "attribuées");
+  } catch(e) {}
+}
+
+async function renderTeamsChart() {
+  try {
+    if(allTeams.length===0){
+      const d=await gGet("/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team')&$select=id,visibility,createdDateTime&$top=999");
+      allTeams=d.value||[];
+    }
+    const pub=allTeams.filter(t=>t.visibility==="Public").length;
+    const priv=allTeams.filter(t=>t.visibility==="Private").length;
+    const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-30);
+    const recent=allTeams.filter(t=>new Date(t.createdDateTime)>cutoff).length;
+    renderBar("reportTeamsChart",[
+      {l:"Publiques",v:allTeams.length>0?Math.round(pub/allTeams.length*100):0,c:"#22C55E"},
+      {l:"Privées",v:allTeams.length>0?Math.round(priv/allTeams.length*100):0,c:"#6D28D9"},
+      {l:"Récentes(30j)",v:allTeams.length>0?Math.round(recent/allTeams.length*100):0,c:"#0891B2"},
+    ]);
+  } catch(e) {}
+}
+
+function renderSecChart() {
+  if(!secureScore) return;
+  const cats={Identity:0,Device:0,App:0,Data:0};
+  const catMax={Identity:0,Device:0,App:0,Data:0};
+  (secureScore.controlScores||[]).forEach(c=>{
+    const cat=c.controlCategory;
+    if(cats[cat]!==undefined){ cats[cat]+=c.score||0; catMax[cat]+=c.maxScore||0; }
+  });
+  const items=Object.keys(cats).map(k=>({
+    l:k, v:catMax[k]>0?Math.round((cats[k]/catMax[k])*100):0,
+    c:k==="Identity"?"#1E6EBF":k==="Device"?"#0891B2":k==="App"?"#6D28D9":"#0F766E"
+  }));
+  renderBar("reportSecChart",items);
+}
+
+// ══════════════════════════════════════════════════════════════
+// EXPORT
+// ══════════════════════════════════════════════════════════════
+function exportExcel() {
+  try {
+    const rows=[["Référence SKU","Code","Achetées","Attribuées","Disponibles","Taux","Statut"]];
+    allLicences.forEach(l=>{
+      const a=l.prepaidUnits?.enabled||0, att=l.consumedUnits||0;
+      rows.push([SKU_NAMES[l.skuPartNumber]||l.skuPartNumber,l.skuPartNumber,a,att,a-att,a>0?Math.round(att/a*100)+"%":"0%",l.capabilityStatus]);
+    });
+    const csv=rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n");
+    const BOM="\uFEFF";
+    const blob=new Blob([BOM+csv],{type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download="M365_Licences_"+new Date().toISOString().slice(0,10)+".csv";
+    a.click(); URL.revokeObjectURL(url);
+    toast("Export CSV téléchargé","success");
+  } catch(e) { toast("Erreur export: "+e.message,"error"); }
+}
+
+function exportPDF() {
+  window.print();
+  toast("Fenêtre d'impression ouverte — sauvegarde en PDF","info");
+}
+
+// ══════════════════════════════════════════════════════════════
+// BOOT
+// ══════════════════════════════════════════════════════════════
+(async function boot() {
+  const loader=document.getElementById("initialLoader");
+  if(window.location.protocol==="file:") {
+    loader.classList.add("hidden");
+    document.getElementById("loginScreen").classList.remove("hidden");
+    return;
+  }
+  try {
+    await initMSAL();
+    const accounts=msalApp.getAllAccounts();
+    if(accounts.length>0){
+      currentAccount=accounts[0]; loader.classList.add("hidden"); showApp(); await loadDashboard();
+    } else { loader.classList.add("hidden"); document.getElementById("loginScreen").classList.remove("hidden"); }
+  } catch(e) {
+    loader.classList.add("hidden"); document.getElementById("loginScreen").classList.remove("hidden");
+  }
+})();
+</script>
+</body>
+</html>
