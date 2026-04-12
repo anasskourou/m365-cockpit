@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M365 Admin Center</title>
+<!-- Teams JS SDK -->
+<script src="https://res.cdn.office.net/teams-js/2.22.0/js/MicrosoftTeams.min.js"></script>
+<!-- MSAL -->
+<script src="https://unpkg.com/@azure/msal-browser@3.10.0/lib/msal-browser.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  /* Teams color tokens */
+  --teams-bg:#F5F5F5;
+  --teams-surface:#FFFFFF;
+  --teams-nav:#201F1E;
+  --teams-brand:#6264A7;
+  --teams-brand2:#8B8CC7;
+  --teams-text:#201F1E;
+  --teams-text2:#605E5C;
+  --teams-border:#E1DFDD;
+  --teams-hover:#F3F2F1;
+  --teams-active:#EDEBE9;
+  --teams-red:#C50F1F;
+  --teams-lred:#FCE4E4;
+  --teams-green:#107C10;
+  --teams-lgreen:#DFF6DD;
+  --teams-amber:#835B00;
+  --teams-lamber:#FFF4CE;
+  --teams-blue:#0F6CBD;
+  --teams-lblue:#CFE4F7;
+  --teams-purple:#5C2E91;
+  --teams-lpurp:#EDE9FE;
+  --navy:#0F2044;
+  --border:var(--teams-border);
+}
+
+/* Dark theme support */
+body.dark{
+  --teams-bg:#1B1A19;
+  --teams-surface:#292827;
+  --teams-text:#F3F2F1;
+  --teams-text2:#C8C6C4;
+  --teams-border:#3B3A39;
+  --teams-hover:#3B3A39;
+  --teams-active:#484644;
+}
+
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--teams-bg);color:var(--teams-text);min-height:100vh;font-size:14px}
+
+/* ── SPLASH ── */
+#splash{position:fixed;inset:0;background:var(--navy);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:999}
+#splash.hidden{display:none}
+.splash-logo{width:64px;height:64px;background:linear-gradient(135deg,var(--teams-brand),#8B5CF6);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px}
+.splash-title{font-size:18px;font-weight:700;color:white}
+.splash-spin{width:28px;height:28px;border:3px solid rgba(255,255,255,0.15);border-top-color:var(--teams-brand2);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── LAYOUT ── */
+#app{display:none;min-height:100vh;flex-direction:column}
+#app.visible{display:flex}
+
+/* ── HEADER ── */
+.header{height:48px;background:var(--navy);display:flex;align-items:center;padding:0 16px;gap:10px;flex-shrink:0}
+.header-logo{width:24px;height:24px;background:linear-gradient(135deg,var(--teams-brand),#8B5CF6);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px}
+.header-title{font-size:14px;font-weight:600;color:white;flex:1}
+.header-user{font-size:11px;color:rgba(255,255,255,0.5)}
+.header-btn{padding:4px 10px;border-radius:4px;font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:white;transition:all 0.15s}
+.header-btn:hover{background:rgba(255,255,255,0.15)}
+.header-scan{background:var(--teams-brand);border-color:transparent}
+.header-scan:hover{background:var(--teams-brand2)}
+.header-scan:disabled{opacity:0.5;cursor:not-allowed}
+
+/* ── LOADING BAR ── */
+#loadbar{height:2px;background:linear-gradient(90deg,var(--teams-brand),#8B5CF6,var(--teams-brand));background-size:200%;animation:lbar 1.2s linear infinite;display:none}
+#loadbar.on{display:block}
+@keyframes lbar{to{background-position:-200% 0}}
+
+/* ── NAV TABS ── */
+.nav{background:var(--teams-surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto;flex-shrink:0;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav-tab{padding:10px 14px;font-size:13px;font-weight:400;color:var(--teams-text2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:6px;transition:all 0.15s;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit}
+.nav-tab:hover{color:var(--teams-text);background:var(--teams-hover)}
+.nav-tab.active{color:var(--teams-brand);border-bottom-color:var(--teams-brand);font-weight:600}
+
+/* ── MAIN ── */
+.main{flex:1;overflow-y:auto;padding:16px}
+
+/* ── SCORE BANNER ── */
+.score-banner{background:linear-gradient(135deg,var(--navy) 0%,#1A3461 100%);border-radius:8px;padding:20px 24px;margin-bottom:16px;display:flex;align-items:center;gap:24px;color:white}
+.score-ring{position:relative;width:88px;height:88px;flex-shrink:0}
+.score-ring svg{transform:rotate(-90deg)}
+.score-ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.score-ring-val{font-size:22px;font-weight:800;line-height:1}
+.score-ring-lbl{font-size:9px;color:rgba(255,255,255,0.5)}
+.score-info{flex:1}
+.score-title{font-size:15px;font-weight:700;margin-bottom:4px}
+.score-sub{font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:10px}
+.pillars{display:flex;gap:8px;flex-wrap:wrap}
+.pillar-pill{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600}
+
+/* ── KPI STRIP ── */
+.kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
+.kpi{background:var(--teams-surface);border:1px solid var(--border);border-radius:6px;padding:12px 14px;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kpi.c1::before{background:var(--teams-brand)} .kpi.c2::before{background:var(--teams-green)}
+.kpi.c3::before{background:var(--teams-amber)} .kpi.c4::before{background:#0891B2} .kpi.c5::before{background:var(--teams-purple)}
+.kpi-lbl{font-size:9px;font-weight:600;color:var(--teams-text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+.kpi-val{font-size:22px;font-weight:700;line-height:1;margin-bottom:2px}
+.kpi-sub{font-size:10px;color:var(--teams-text2)}
+.v1{color:var(--teams-brand)} .v2{color:var(--teams-green)} .v3{color:var(--teams-amber)} .v4{color:#0891B2} .v5{color:var(--teams-purple)}
+
+/* ── GRID ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px}
+.span2{grid-column:1/-1}
+
+/* ── CARD ── */
+.card{background:var(--teams-surface);border:1px solid var(--border);border-radius:6px;padding:14px 16px}
+.card-title{font-size:13px;font-weight:600;color:var(--teams-text);margin-bottom:3px}
+.card-sub{font-size:11px;color:var(--teams-text2);margin-bottom:12px}
+
+/* ── FINDINGS ── */
+.finding{background:var(--teams-surface);border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start;transition:box-shadow 0.15s}
+.finding:hover{box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+.fsev{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.fsev.critical{background:var(--teams-lred)} .fsev.high{background:var(--teams-lamber)}
+.fsev.medium{background:var(--teams-lblue)} .fsev.low{background:var(--teams-lgreen)}
+.fbody{flex:1;min-width:0}
+.ftitle{font-size:13px;font-weight:600;color:var(--teams-text);margin-bottom:2px}
+.fdesc{font-size:11.5px;color:var(--teams-text2);margin-bottom:6px;line-height:1.4}
+.fmeta{display:flex;gap:6px;flex-wrap:wrap}
+.faction{display:flex;gap:6px;flex-direction:column;flex-shrink:0}
+
+/* ── ADOPTION BARS ── */
+.adop{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.adop-icon{width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+.adop-name{font-size:11.5px;color:var(--teams-text2);width:130px;flex-shrink:0}
+.adop-track{flex:1;height:6px;background:var(--teams-hover);border-radius:3px;overflow:hidden}
+.adop-fill{height:100%;border-radius:3px;transition:width 1s ease}
+.adop-pct{font-size:11.5px;font-weight:700;width:34px;text-align:right;flex-shrink:0}
+.adop-note{font-size:10px;color:var(--teams-text2);width:70px;text-align:right;flex-shrink:0}
+
+/* ── TABLE ── */
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{font-size:10px;font-weight:600;color:var(--teams-text2);text-transform:uppercase;padding:5px 8px;border-bottom:1px solid var(--border);text-align:left;background:var(--teams-hover)}
+.tbl td{padding:8px;border-bottom:1px solid var(--teams-hover);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--teams-hover)}
+
+/* ── BADGE ── */
+.badge{display:inline-flex;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:600}
+.b-red{background:var(--teams-lred);color:var(--teams-red)}
+.b-green{background:var(--teams-lgreen);color:var(--teams-green)}
+.b-amber{background:var(--teams-lamber);color:var(--teams-amber)}
+.b-blue{background:var(--teams-lblue);color:var(--teams-blue)}
+.b-purple{background:var(--teams-lpurp);color:var(--teams-purple)}
+.b-gray{background:var(--teams-hover);color:var(--teams-text2)}
+
+/* ── PROGRESS ── */
+.prog{width:64px;height:4px;background:var(--teams-hover);border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:4px}
+.prog-fill{height:100%;border-radius:2px}
+
+/* ── AVATAR ── */
+.av{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white;vertical-align:middle;margin-right:6px}
+
+/* ── BTN ── */
+.btn{padding:5px 12px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all 0.15s;border:none;display:inline-flex;align-items:center;gap:5px}
+.btn:active{transform:scale(0.98)}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+.btn-brand{background:var(--teams-brand);color:white}
+.btn-brand:hover{background:var(--teams-brand2)}
+.btn-danger{background:var(--teams-lred);color:var(--teams-red);border:1px solid rgba(197,15,31,0.2)}
+.btn-success{background:var(--teams-lgreen);color:var(--teams-green);border:1px solid rgba(16,124,16,0.2)}
+.btn-amber{background:var(--teams-lamber);color:var(--teams-amber);border:1px solid rgba(131,91,0,0.2)}
+.btn-ghost{background:var(--teams-hover);color:var(--teams-text);border:1px solid var(--border)}
+.btn-sm{padding:3px 8px;font-size:11px}
+
+/* ── SEARCH ── */
+.search{display:flex;gap:8px;margin-bottom:12px;align-items:center}
+.search-input{flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit;outline:none;background:var(--teams-surface);color:var(--teams-text)}
+.search-input:focus{border-color:var(--teams-brand);box-shadow:0 0 0 2px rgba(98,100,167,0.15)}
+
+/* ── STAT MINI ── */
+.smini{background:var(--teams-surface);border:1px solid var(--border);border-radius:6px;padding:10px 12px;text-align:center}
+.smini-val{font-size:20px;font-weight:700;line-height:1;margin-bottom:2px}
+.smini-lbl{font-size:10px;color:var(--teams-text2)}
+
+/* ── TEAMS CARD ── */
+.tcard{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--teams-hover);border-radius:5px;margin-bottom:6px;cursor:pointer;transition:background 0.1s}
+.tcard:hover{background:var(--teams-active)}
+.tcard-icon{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+
+/* ── MODAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;display:flex;align-items:center;justify-content:center}
+.modal-bg.hidden{display:none}
+.modal{background:var(--teams-surface);border-radius:8px;padding:24px;width:440px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,0.2)}
+.modal-title{font-size:15px;font-weight:700;color:var(--teams-text);margin-bottom:3px}
+.modal-sub{font-size:11.5px;color:var(--teams-text2);margin-bottom:16px}
+.form-group{margin-bottom:12px}
+.form-label{font-size:11px;font-weight:600;color:var(--teams-text2);margin-bottom:3px;display:block}
+.form-input{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:4px;font-size:12.5px;font-family:inherit;outline:none;background:var(--teams-surface);color:var(--teams-text)}
+.form-input:focus{border-color:var(--teams-brand)}
+.form-select{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:4px;font-size:12.5px;font-family:inherit;background:var(--teams-surface);color:var(--teams-text);cursor:pointer}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
+
+/* ── SCAN OVERLAY ── */
+#scanOv{position:fixed;inset:0;background:rgba(15,32,68,0.92);z-index:800;display:flex;align-items:center;justify-content:center}
+#scanOv.hidden{display:none}
+.scan-card{background:#1A3461;border:1px solid rgba(98,100,167,0.3);border-radius:12px;padding:32px 40px;text-align:center;width:400px;max-width:95vw}
+.scan-ico{font-size:40px;margin-bottom:12px;animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.scan-title{font-size:16px;font-weight:700;color:white;margin-bottom:6px}
+.scan-status{font-size:11.5px;color:rgba(255,255,255,0.5);margin-bottom:16px;min-height:16px}
+.scan-bar{width:100%;height:5px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;margin-bottom:10px}
+.scan-fill{height:100%;background:linear-gradient(90deg,var(--teams-brand),#8B5CF6);transition:width 0.4s ease}
+.scan-pct{font-size:20px;font-weight:800;color:white}
+
+/* ── CHART ── */
+.hbar{display:flex;flex-direction:column;gap:8px}
+.hbar-item{display:flex;align-items:center;gap:8px;font-size:11px}
+.hbar-lbl{width:110px;flex-shrink:0;color:var(--teams-text2)}
+.hbar-track{flex:1;height:8px;background:var(--teams-hover);border-radius:4px;overflow:hidden}
+.hbar-fill{height:100%;border-radius:4px;transition:width 1s ease}
+.hbar-val{width:32px;text-align:right;font-weight:700;flex-shrink:0}
+
+/* ── DONUT ── */
+.donut-wrap{display:flex;align-items:center;gap:16px}
+.donut-rel{position:relative;width:110px;height:110px;flex-shrink:0}
+.donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.donut-val{font-size:18px;font-weight:800}
+.donut-sub{font-size:9px;color:var(--teams-text2)}
+.legend{display:flex;flex-direction:column;gap:6px;flex:1}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:11px}
+.legend-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:16px;right:16px;padding:10px 16px;border-radius:6px;font-size:12.5px;font-weight:500;color:white;z-index:9999;transform:translateY(60px);opacity:0;transition:all 0.25s;pointer-events:none;max-width:320px;box-shadow:0 4px 16px rgba(0,0,0,0.2)}
+#toast.show{transform:translateY(0);opacity:1}
+#toast.success{background:var(--teams-green)} #toast.error{background:var(--teams-red)}
+#toast.info{background:var(--teams-brand)} #toast.warn{background:var(--teams-amber)}
+
+/* ── ERR BOX ── */
+.err{padding:8px 12px;background:var(--teams-lred);border:1px solid rgba(197,15,31,0.2);border-radius:5px;font-size:11.5px;color:var(--teams-red);margin-bottom:8px}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:28px;color:var(--teams-text2)}
+.empty-ico{font-size:28px;margin-bottom:6px}
+.empty-txt{font-size:12px}
+
+.hidden{display:none!important}
+@media(max-width:800px){.kpi-strip{grid-template-columns:1fr 1fr}.g2,.g3{grid-template-columns:1fr}}
+@media print{.header,.nav,.btn,.modal-bg,#toast{display:none!important}}
+</style>
+</head>
+<body>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="splash-logo">🛡️</div>
+  <div class="splash-title">M365 Admin Center</div>
+  <div class="splash-spin"></div>
+</div>
+
+<!-- SCAN OVERLAY -->
+<div id="scanOv" class="hidden">
+  <div class="scan-card">
+    <div class="scan-ico">🛡️</div>
+    <div class="scan-title">Audit Zero Trust en cours...</div>
+    <div class="scan-status" id="scanStatus">Initialisation...</div>
+    <div class="scan-bar"><div class="scan-fill" id="scanFill" style="width:0%"></div></div>
+    <div class="scan-pct" id="scanPct">0%</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div id="loadbar"></div>
+  <div class="header">
+    <div class="header-logo">M</div>
+    <div class="header-title">M365 Admin Center <span style="font-size:10px;color:rgba(255,255,255,0.4);font-weight:400" id="hTenant"></span></div>
+    <span class="header-user" id="hUser"></span>
+    <button class="header-btn header-scan" id="btnScan" onclick="runScan()">🔍 Audit</button>
+    <button class="header-btn" onclick="signOut()">Déconnexion</button>
+  </div>
+
+  <div class="nav">
+    <button class="nav-tab active" onclick="go('dashboard')" id="tab-dashboard">📊 Dashboard</button>
+    <button class="nav-tab" onclick="go('users')" id="tab-users">👤 Utilisateurs</button>
+    <button class="nav-tab" onclick="go('security')" id="tab-security">🔒 Sécurité</button>
+    <button class="nav-tab" onclick="go('licences')" id="tab-licences">🔑 Licences</button>
+    <button class="nav-tab" onclick="go('teams')" id="tab-teams">💬 Teams</button>
+    <button class="nav-tab" onclick="go('reports')" id="tab-reports">📈 Rapports</button>
+    <button class="nav-tab" onclick="go('actions')" id="tab-actions">⚡ Actions</button>
+  </div>
+
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div id="pane-dashboard">
+      <div class="score-banner">
+        <div class="score-ring">
+          <svg width="88" height="88" viewBox="0 0 88 88">
+            <circle cx="44" cy="44" r="36" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="8"/>
+            <circle cx="44" cy="44" r="36" fill="none" stroke="url(#sg)" stroke-width="8"
+              stroke-linecap="round" stroke-dasharray="226" id="scoreArc" style="stroke-dashoffset:226;transition:stroke-dashoffset 1.5s ease"/>
+            <defs><linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#6264A7"/><stop offset="100%" stop-color="#8B5CF6"/>
+            </linearGradient></defs>
+          </svg>
+          <div class="score-ring-center"><div class="score-ring-val" id="ztScore">—</div><div class="score-ring-lbl">/ 100</div></div>
+        </div>
+        <div class="score-info">
+          <div class="score-title">Score Zero Trust — <span id="scoreOrg">ALTEN</span></div>
+          <div class="score-sub" id="scoreDate">Lance un audit pour calculer ton score</div>
+          <div class="pillars" id="pillars"><span class="pillar-pill" style="background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);font-size:11px">⏳ Audit requis</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="btn btn-brand" onclick="runScan()">🔍 Lancer l'audit</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportCSV()">📥 Export CSV</button>
+        </div>
+      </div>
+
+      <div class="kpi-strip">
+        <div class="kpi c1"><div class="kpi-lbl">Équipes Teams</div><div class="kpi-val v1" id="kTeams">—</div><div class="kpi-sub" id="kTeamsSub">—</div></div>
+        <div class="kpi c2"><div class="kpi-lbl">Secure Score</div><div class="kpi-val v2" id="kScore">—</div><div class="kpi-sub" id="kScoreSub">—</div></div>
+        <div class="kpi c3"><div class="kpi-lbl">Licences</div><div class="kpi-val v3" id="kLic">—</div><div class="kpi-sub" id="kLicSub">—</div></div>
+        <div class="kpi c4"><div class="kpi-lbl">Utilisateurs</div><div class="kpi-val v4" id="kUsers">—</div><div class="kpi-sub" id="kUsersSub">—</div></div>
+        <div class="kpi c5"><div class="kpi-lbl">Risques critiques</div><div class="kpi-val v5" id="kRisks">—</div><div class="kpi-sub" id="kRisksSub">—</div></div>
+      </div>
+
+      <div class="g2">
+        <div class="card">
+          <div class="card-title">Adoption M365</div>
+          <div class="card-sub" id="adoptSub">—</div>
+          <div id="adoptList"><div class="empty"><div class="empty-ico">📊</div><div class="empty-txt">Lance un audit</div></div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Contrôles Zero Trust</div>
+          <div class="card-sub">État des contrôles de sécurité</div>
+          <div id="checks"><div class="empty"><div class="empty-txt">Audit requis</div></div></div>
+        </div>
+      </div>
+
+      <div class="g3">
+        <div class="card">
+          <div class="card-title">Findings critiques</div>
+          <div id="criticalList"><div class="empty"><div class="empty-txt">Audit requis</div></div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Licences — Top SKUs</div>
+          <div id="licTop"><div class="empty"><div class="empty-txt">Chargement...</div></div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Équipes récentes</div>
+          <div id="teamsRecent"><div class="empty"><div class="empty-txt">Chargement...</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div id="pane-users" class="hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:15px;font-weight:700" id="usersTitle">Utilisateurs</div>
+        <button class="btn btn-brand" onclick="openModal('mCreateUser')">+ Créer</button>
+      </div>
+      <div class="search">
+        <input class="search-input" id="usersQ" placeholder="🔍 Rechercher..." oninput="filterUsers()">
+        <select class="form-select" style="width:140px" id="usersF" onchange="filterUsers()">
+          <option value="all">Tous</option><option value="active">Actifs</option><option value="inactive">Inactifs</option>
+        </select>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead><tr><th>Utilisateur</th><th>Département</th><th>Titre</th><th>Licences</th><th>Statut</th><th>Actions</th></tr></thead>
+          <tbody id="usersBody"><tr><td colspan="6" style="text-align:center;padding:20px;color:var(--teams-text2)">Chargement...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SECURITY -->
+    <div id="pane-security" class="hidden">
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px">Sécurité & Zero Trust</div>
+      <div class="g2">
+        <div class="card">
+          <div class="card-title">Microsoft Secure Score</div>
+          <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:12px">
+            <div>
+              <div style="width:90px;height:90px;border-radius:50%;border:7px solid var(--teams-hover);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:border-color 0.5s" id="secCircle">
+                <div style="font-size:24px;font-weight:800" id="secNum">—</div>
+                <div style="font-size:9px;color:var(--teams-text2)">/ 100</div>
+              </div>
+              <div style="text-align:center;font-size:10px;color:var(--teams-text2);margin-top:4px" id="secPts"></div>
+            </div>
+            <div style="flex:1" id="secChecks"><div class="empty-txt" style="color:var(--teams-text2);font-size:11px">Audit requis</div></div>
+          </div>
+          <div style="font-size:12px;font-weight:600;margin-bottom:8px">Top actions recommandées</div>
+          <div id="secActions"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Alertes de sécurité</div>
+          <div id="alertsList"><div class="empty"><div class="empty-txt">Chargement...</div></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Comptes sans MFA</div>
+        <div id="noMfaList"><div class="empty"><div class="empty-txt">Audit requis</div></div></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Politiques Conditional Access</div>
+        <div id="caList"><div class="empty"><div class="empty-txt">Chargement...</div></div></div>
+      </div>
+    </div>
+
+    <!-- LICENCES -->
+    <div id="pane-licences" class="hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:15px;font-weight:700">Licences M365</div>
+        <button class="btn btn-amber" onclick="reclaimLicences()">♻ Récupérer inactives</button>
+      </div>
+      <div class="g3" id="licStats" style="margin-bottom:12px"></div>
+      <div style="overflow-x:auto;margin-bottom:12px">
+        <table class="tbl">
+          <thead><tr><th>SKU</th><th>Code</th><th>Achetées</th><th>Attribuées</th><th>Disponibles</th><th>Utilisation</th><th>Coût inactif</th><th>Statut</th></tr></thead>
+          <tbody id="licBody"><tr><td colspan="8" style="text-align:center;padding:16px;color:var(--teams-text2)">Chargement...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-title">💡 Recommandations d'optimisation</div>
+        <div id="licReco"></div>
+      </div>
+    </div>
+
+    <!-- TEAMS -->
+    <div id="pane-teams" class="hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:15px;font-weight:700" id="teamsTitle">Teams & Groupes</div>
+        <button class="btn btn-brand" onclick="openModal('mCreateTeam')">+ Créer une équipe</button>
+      </div>
+      <div class="g3" id="teamsStats" style="margin-bottom:12px"></div>
+      <div class="g2">
+        <div class="card">
+          <div class="search" style="margin-bottom:8px">
+            <input class="search-input" id="teamsQ" placeholder="🔍 Rechercher..." oninput="filterTeams()">
+            <select class="form-select" style="width:120px" id="teamsF" onchange="filterTeams()">
+              <option value="all">Toutes</option><option value="Public">Publiques</option><option value="Private">Privées</option>
+            </select>
+          </div>
+          <div id="teamsList" style="max-height:380px;overflow-y:auto"></div>
+        </div>
+        <div class="card" id="teamDetailCard">
+          <div style="font-size:12px;font-weight:600;margin-bottom:8px">Détail de l'équipe</div>
+          <div id="teamDetail"><div class="empty"><div class="empty-ico">👈</div><div class="empty-txt">Sélectionne une équipe</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- REPORTS -->
+    <div id="pane-reports" class="hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:15px;font-weight:700">Rapports d'adoption</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-success btn-sm" onclick="exportCSV()">📥 CSV</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ PDF</button>
+        </div>
+      </div>
+      <div class="g3" id="reportStats" style="margin-bottom:12px"></div>
+      <div class="g2">
+        <div class="card">
+          <div class="card-title">Adoption par service</div>
+          <div id="rAdopt"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Répartition des licences</div>
+          <div id="rLic" style="display:flex;align-items:center;padding:8px 0"></div>
+        </div>
+      </div>
+      <div class="g2" style="margin-top:12px">
+        <div class="card">
+          <div class="card-title">Teams — Distribution</div>
+          <div id="rTeams"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Zero Trust — Score par pilier</div>
+          <div id="rSec"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div id="pane-actions" class="hidden">
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">⚡ Actions correctives</div>
+      <div style="font-size:11.5px;color:var(--teams-text2);margin-bottom:14px">Chaque action modifie directement ton tenant via Microsoft Graph API.</div>
+      <div class="g2">
+        <div class="card">
+          <div style="font-size:12px;font-weight:600;margin-bottom:10px">👤 Identités</div>
+          <div id="aIdentity"></div>
+        </div>
+        <div class="card">
+          <div style="font-size:12px;font-weight:600;margin-bottom:10px">🔗 Applications & CA</div>
+          <div id="aApps"></div>
+        </div>
+        <div class="card">
+          <div style="font-size:12px;font-weight:600;margin-bottom:10px">🗂️ Données & Purview</div>
+          <div id="aData"></div>
+        </div>
+        <div class="card">
+          <div style="font-size:12px;font-weight:600;margin-bottom:10px">🌐 Réseau & Alertes</div>
+          <div id="aNet"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div style="font-size:12px;font-weight:600;margin-bottom:10px">🚀 Actions groupées</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-danger" onclick="fixAllCritical()">🔴 Corriger tous les critiques</button>
+          <button class="btn btn-amber" onclick="enableMFAAll()">🔑 Forcer MFA — tous les users</button>
+          <button class="btn btn-brand" onclick="blockLegacyAuth()">🚫 Bloquer auth legacy</button>
+          <button class="btn btn-success" onclick="enableSSPR()">🔓 Activer SSPR</button>
+          <button class="btn btn-ghost" onclick="createMFAPolicy()">📋 Créer politique CA MFA</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- MODALS -->
+<div class="modal-bg hidden" id="mCreateUser">
+  <div class="modal">
+    <div class="modal-title">Créer un utilisateur</div>
+    <div class="modal-sub">Nouveau compte Microsoft 365</div>
+    <div class="form-group"><label class="form-label">Prénom *</label><input class="form-input" id="uFirst" placeholder="Jean"></div>
+    <div class="form-group"><label class="form-label">Nom *</label><input class="form-input" id="uLast" placeholder="Dupont"></div>
+    <div class="form-group"><label class="form-label">Email (UPN) *</label><input class="form-input" id="uUPN" placeholder="jean.dupont@contoso.com"></div>
+    <div class="form-group"><label class="form-label">Département</label><input class="form-input" id="uDept" placeholder="IT"></div>
+    <div class="form-group"><label class="form-label">Titre</label><input class="form-input" id="uTitle" placeholder="Ingénieur IT"></div>
+    <div class="form-group"><label class="form-label">Mot de passe temporaire *</label><input class="form-input" type="password" id="uPwd" placeholder="Min. 8 caractères"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('mCreateUser')">Annuler</button>
+      <button class="btn btn-brand" onclick="createUser()">Créer</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg hidden" id="mCreateTeam">
+  <div class="modal">
+    <div class="modal-title">Créer une équipe Teams</div>
+    <div class="modal-sub">Un groupe Microsoft 365 sera créé automatiquement</div>
+    <div class="form-group"><label class="form-label">Nom de l'équipe *</label><input class="form-input" id="tName" placeholder="Ex: Projet Innovation"></div>
+    <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="tDesc" placeholder="Description de l'équipe"></div>
+    <div class="form-group"><label class="form-label">Visibilité</label>
+      <select class="form-select" id="tVis"><option value="Private">Privée</option><option value="Public">Publique</option></select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('mCreateTeam')">Annuler</button>
+      <button class="btn btn-brand" onclick="createTeam()">Créer</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg hidden" id="mConfirm">
+  <div class="modal">
+    <div class="modal-title" id="mConfirmTitle">Confirmer</div>
+    <div class="modal-sub" id="mConfirmSub"></div>
+    <div style="padding:10px 12px;background:var(--teams-lamber);border-radius:5px;font-size:11.5px;color:var(--teams-amber);margin-bottom:12px">⚠ Cette action modifie ton tenant Microsoft 365.</div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('mConfirm')">Annuler</button>
+      <button class="btn btn-danger" id="mConfirmBtn">Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// CONFIG — MODIFIE CES DEUX LIGNES
+// ══════════════════════════════════════════════════════════════
+const CLIENT_ID = "24c5310c-a6e6-4c3e-bdc0-0d2e499f494a";
+const TENANT_ID = "85907234-b548-4611-9dbd-491d8a5a50e7";
+
+const SCOPES = [
+  "User.Read","User.ReadWrite.All","User.Read.All",
+  "Directory.Read.All","Directory.ReadWrite.All",
+  "Policy.Read.All","Policy.ReadWrite.ConditionalAccess",
+  "SecurityEvents.Read.All","SecurityEvents.ReadWrite.All",
+  "DeviceManagementManagedDevices.Read.All",
+  "Application.Read.All","Reports.Read.All",
+  "Organization.Read.All","AuditLog.Read.All",
+  "Group.Read.All","Group.ReadWrite.All",
+  "GroupMember.Read.All","GroupMember.ReadWrite.All",
+  "LicenseAssignment.ReadWrite.All",
+  "Sites.Read.All","InformationProtectionPolicy.Read",
+];
+
+const GRAPH = "https://graph.microsoft.com/v1.0";
+const GRAPH_B = "https://graph.microsoft.com/beta";
+
+const SKU_NAMES = {
+  "ENTERPRISEPREMIUM":"M365 E5","ENTERPRISEPACK":"M365 E3","SPE_F1":"M365 F3",
+  "POWER_BI_PRO":"Power BI Pro","MCOCAP":"Teams Phone","M365_COPILOT":"Copilot M365",
+  "EMSPREMIUM":"EMS E5","DEVELOPERPACK_E5":"M365 E5 Dev","POWERAPPS_DEV":"Power Apps Dev",
+  "FLOW_FREE":"Power Automate Free",
+};
+const SKU_PRICE = {"ENTERPRISEPREMIUM":55,"ENTERPRISEPACK":30,"SPE_F1":11,"POWER_BI_PRO":9,"MCOCAP":8,"M365_COPILOT":28};
+
+// ── MSAL ──────────────────────────────────────────────────────
+const MSAL_URLS = [
+  "https://unpkg.com/@azure/msal-browser@3.10.0/lib/msal-browser.min.js",
+  "https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.10.0/lib/msal-browser.min.js",
+  "https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js",
+];
+function loadScript(u){ return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=u; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+async function loadMSAL(){ for(const u of MSAL_URLS){ try{ await loadScript(u); if(typeof msal!=="undefined") return true; }catch(e){} } return false; }
+
+let msalApp=null, currentAccount=null;
+async function initMSAL(){
+  if(!await loadMSAL()) throw new Error("MSAL unavailable");
+  msalApp=new msal.PublicClientApplication({
+    auth:{ clientId:CLIENT_ID, authority:`https://login.microsoftonline.com/${TENANT_ID}`, redirectUri:window.location.href.split("?")[0].split("#")[0], navigateToLoginRequestUrl:true },
+    cache:{ cacheLocation:"localStorage", storeAuthStateInCookie:true }
+  });
+  await msalApp.initialize();
+}
+
+async function signOut(){ if(msalApp) try{ await msalApp.logoutRedirect({account:currentAccount}); }catch(e){ location.reload(); } }
+
+async function getToken(){
+  try{ const r=await msalApp.acquireTokenSilent({scopes:SCOPES,account:currentAccount}); return r.accessToken; }
+  catch{ await msalApp.acquireTokenRedirect({scopes:SCOPES}); return null; }
+}
+
+// ── GRAPH ─────────────────────────────────────────────────────
+async function graph(path, method="GET", body=null, beta=false){
+  const token=await getToken(); if(!token) return null;
+  const opts={ method, headers:{ Authorization:"Bearer "+token, "Content-Type":"application/json", ConsistencyLevel:"eventual" } };
+  if(body) opts.body=JSON.stringify(body);
+  const r=await fetch((beta?GRAPH_B:GRAPH)+path, opts);
+  if(r.status===204) return {};
+  if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.error?.message||`HTTP ${r.status}`); }
+  return r.json();
+}
+const G=(p,b=false)=>graph(p,"GET",null,b);
+const Po=(p,d,b=false)=>graph(p,"POST",d,b);
+const Pa=(p,d,b=false)=>graph(p,"PATCH",d,b);
+
+// ── UI ────────────────────────────────────────────────────────
+function setLoading(on){ document.getElementById("loadbar").classList.toggle("on",on); const b=document.getElementById("btnScan"); if(b){b.disabled=on;b.textContent=on?"⏳ Scan...":"🔍 Audit";} }
+function toast(m,t="info"){ const el=document.getElementById("toast"); el.textContent=m; el.className="show "+t; setTimeout(()=>el.className="",4000); }
+function fmt(n){ const v=parseInt(n)||0; return v>=1000?(v/1000).toFixed(1)+"K":v.toLocaleString("fr-FR"); }
+function openModal(id){ document.getElementById(id).classList.remove("hidden"); }
+function closeModal(id){ document.getElementById(id).classList.add("hidden"); }
+function confirm2(title,sub,fn){ document.getElementById("mConfirmTitle").textContent=title; document.getElementById("mConfirmSub").textContent=sub; document.getElementById("mConfirmBtn").onclick=()=>{ closeModal("mConfirm"); fn(); }; openModal("mConfirm"); }
+function errBox(m){ return `<div class="err">⚠ ${m}</div>`; }
+
+// ── TABS ──────────────────────────────────────────────────────
+let tab="dashboard"; let tabDone={};
+function go(t){
+  document.querySelectorAll(".nav-tab").forEach(x=>x.classList.remove("active"));
+  document.getElementById("tab-"+t).classList.add("active");
+  document.querySelectorAll("[id^='pane-']").forEach(p=>p.classList.add("hidden"));
+  document.getElementById("pane-"+t).classList.remove("hidden");
+  tab=t;
+  if(!tabDone[t]){ loadTab(t); tabDone[t]=true; }
+  // Teams SDK — notify current frame
+  try{ microsoftTeams.pages.currentApp.navigateTo({pageId:t}); }catch(e){}
+}
+async function loadTab(t){
+  setLoading(true);
+  try{
+    if(t==="users")    await loadUsers();
+    if(t==="security") await Promise.allSettled([loadSecureScore(),loadAlerts(),loadCA(),loadNoMFA()]);
+    if(t==="licences") await loadLicences();
+    if(t==="teams")    await loadTeamsPane();
+    if(t==="reports")  await loadReports();
+    if(t==="actions")  renderActions();
+  }catch(e){ toast("Erreur: "+e.message,"error"); }
+  setLoading(false);
+}
+
+// ── DATA STORE ────────────────────────────────────────────────
+let D={ users:[],noMfa:[],inactive:[],risky:[],devices:[],apps:[],caPolicies:[],legacyEnabled:false,labels:[],namedLocs:[],secureScore:null,alerts:[],teams:[],licences:[],org:"",scannedAt:null };
+let findings=[];
+
+// ── SCAN ──────────────────────────────────────────────────────
+function setScan(pct,status){ document.getElementById("scanFill").style.width=pct+"%"; document.getElementById("scanPct").textContent=pct+"%"; document.getElementById("scanStatus").textContent=status; }
+
+async function runScan(){
+  document.getElementById("scanOv").classList.remove("hidden");
+  document.getElementById("btnScan").disabled=true;
+  findings=[]; D.scannedAt=new Date();
+
+  const steps=[
+    [8,  "Organisation & tenant...",     scanOrg],
+    [20, "Identités & MFA...",           scanIdentities],
+    [32, "Utilisateurs à risque...",     scanRisky],
+    [44, "Appareils Intune...",          scanDevices],
+    [55, "Applications & permissions...",scanApps],
+    [66, "Conditional Access...",        scanCA],
+    [74, "Purview & données...",         scanData],
+    [82, "Réseau & locations...",        scanNetwork],
+    [90, "Secure Score...",              scanSecureScore],
+    [97, "Alertes sécurité...",          scanAlerts_],
+    [100,"Finalisation...",              async()=>{}],
+  ];
+
+  for(const [pct,status,fn] of steps){
+    setScan(pct,status);
+    try{ await fn(); }catch(e){ console.warn(status,e.message); }
+    await new Promise(r=>setTimeout(r,250));
+  }
+
+  document.getElementById("scanOv").classList.add("hidden");
+  document.getElementById("btnScan").disabled=false;
+  // Reset tab cache pour forcer re-render
+  tabDone={dashboard:false};
+  renderDashboard();
+  renderSecurityPane();
+  renderReports();
+  renderActions();
+  toast("✅ Audit terminé — "+findings.length+" findings","success");
+}
+
+// ── SCAN FUNCTIONS ────────────────────────────────────────────
+async function scanOrg(){
+  try{ const o=await G("/organization?$select=displayName,verifiedDomains"); D.org=(o.value?.[0]?.displayName||"Tenant"); document.getElementById("scoreOrg").textContent=D.org; document.getElementById("hTenant").textContent="· "+D.org; }catch(e){}
+}
+
+async function scanIdentities(){
+  try{
+    const d=await G("/users?$select=id,displayName,userPrincipalName,accountEnabled,signInActivity,assignedLicenses&$top=999");
+    D.users=d.value||[];
+    try{
+      const mfa=await G("/reports/authenticationMethods/userRegistrationDetails?$top=999",true);
+      D.noMfa=(mfa.value||[]).filter(u=>!u.isMfaRegistered&&u.isEnabled);
+      if(D.noMfa.length>0) addF("critical","Comptes sans MFA",`${D.noMfa.length} comptes actifs sans MFA`,"identity",()=>enableMFAAll());
+    }catch(e){}
+    const c90=new Date(); c90.setDate(c90.getDate()-90);
+    D.inactive=D.users.filter(u=>{const l=u.signInActivity?.lastSignInDateTime;return u.accountEnabled&&u.assignedLicenses?.length>0&&l&&new Date(l)<c90;});
+    if(D.inactive.length>0) addF("high","Comptes inactifs avec licences",`${D.inactive.length} comptes inactifs +90j avec licences`,"identity",null);
+    document.getElementById("kUsers").textContent=fmt(D.users.filter(u=>u.accountEnabled).length);
+    document.getElementById("kUsersSub").textContent=D.users.length+" comptes total";
+  }catch(e){}
+}
+
+async function scanRisky(){
+  try{ const d=await G("/identityProtection/riskyUsers?$filter=riskState eq 'atRisk'&$top=50",true).catch(()=>({value:[]})); D.risky=d.value||[]; if(D.risky.length>0) addF("critical","Utilisateurs à risque",`${D.risky.length} user(s) signalés par Identity Protection`,"identity",null); }catch(e){}
+}
+
+async function scanDevices(){
+  try{ const d=await G("/deviceManagement/managedDevices?$select=id,deviceName,operatingSystem,complianceState,lastSyncDateTime&$top=200",true).catch(()=>({value:[]})); D.devices=d.value||[]; const nc=D.devices.filter(x=>x.complianceState!=="compliant"); if(nc.length>0) addF("high","Appareils non conformes",`${nc.length} appareil(s) Intune non conformes`,"devices",null); }catch(e){}
+}
+
+async function scanApps(){
+  try{
+    const d=await G("/applications?$select=id,displayName,signInAudience,createdDateTime&$top=200");
+    D.apps=d.value||[];
+    const mt=D.apps.filter(a=>a.signInAudience!=="AzureADMyOrg");
+    if(mt.length>0) addF("medium","Applications multi-tenant",`${mt.length} app(s) configurée(s) multi-tenant`,"apps",null);
+  }catch(e){}
+}
+
+async function scanCA(){
+  try{
+    const d=await G("/identity/conditionalAccess/policies?$select=id,displayName,state,conditions,grantControls",true);
+    D.caPolicies=d.value||[];
+    const active=D.caPolicies.filter(p=>p.state==="enabled");
+    const hasMfa=active.some(p=>p.grantControls?.builtInControls?.includes("mfa"));
+    const hasLegacy=active.some(p=>p.conditions?.clientAppTypes?.includes("exchangeActiveSync")||p.conditions?.clientAppTypes?.includes("other"));
+    if(!hasMfa) addF("critical","Aucune politique CA avec MFA","Aucune CA n'impose le MFA pour les utilisateurs","apps",()=>createMFAPolicy());
+    if(!hasLegacy){ D.legacyEnabled=true; addF("critical","Auth. legacy non bloquée","SMTP/IMAP/POP3 non bloqués par CA","apps",()=>blockLegacyAuth()); }
+  }catch(e){}
+}
+
+async function scanData(){
+  try{ const d=await G("/informationProtection/policy/labels",true).catch(()=>({value:[]})); D.labels=d.value||[]; if(D.labels.length===0) addF("high","Aucun Sensitivity Label","Purview sans labels de sensibilité","data",null); }catch(e){}
+  try{ const d=await G("/identity/conditionalAccess/namedLocations",true).catch(()=>({value:[]})); D.namedLocs=d.value||[]; }catch(e){}
+}
+
+async function scanNetwork(){
+  try{ if(D.namedLocs.length===0) addF("medium","Aucune Named Location","Pas d'emplacement de confiance configuré","network",null); }catch(e){}
+}
+
+async function scanSecureScore(){
+  try{
+    const d=await G("/security/secureScores?$top=1",true);
+    D.secureScore=d.value?.[0];
+    if(D.secureScore){
+      const pct=Math.round((D.secureScore.currentScore/D.secureScore.maxScore)*100);
+      document.getElementById("kScore").textContent=pct+"%";
+      document.getElementById("kScoreSub").textContent=D.secureScore.currentScore+" / "+D.secureScore.maxScore+" pts";
+    }
+  }catch(e){}
+}
+
+async function scanAlerts_(){
+  try{
+    let d;
+    try{ d=await G("/security/alerts_v2?$top=50&$orderby=createdDateTime desc",true); }
+    catch(e){ try{ d=await G("/security/alerts?$top=20",true); }catch(e2){ d={value:[]}; } }
+    D.alerts=d.value||[];
+    const high=D.alerts.filter(a=>a.severity==="high"||a.severity==="critical");
+    if(high.length>0) addF("critical","Alertes Defender haute priorité",`${high.length} alerte(s) non résolue(s)`,"network",null);
+    document.getElementById("kRisks").textContent=findings.filter(f=>f.sev==="critical").length;
+    document.getElementById("kRisksSub").textContent=findings.length+" findings total";
+  }catch(e){}
+}
+
+// ── FINDINGS ──────────────────────────────────────────────────
+function addF(sev,title,desc,pillar,fn){ findings.push({id:findings.length,sev,title,desc,pillar,fn,fixed:false}); }
+function sevIco(s){ return {critical:"🔴",high:"🟠",medium:"🟡",low:"🟢"}[s]||"⚪"; }
+function sevBadge(s){ return {critical:"b-red",high:"b-amber",medium:"b-blue",low:"b-green"}[s]||"b-gray"; }
+function renderFinding(f){
+  const btn=f.fn?`<button class="btn btn-sm btn-danger" onclick="execF(${f.id})">⚡ Corriger</button>`:"";
+  return `<div class="finding" id="f${f.id}" style="${f.fixed?"opacity:0.5":""}">
+    <div class="fsev ${f.sev}">${sevIco(f.sev)}</div>
+    <div class="fbody">
+      <div class="ftitle">${f.fixed?"✅ ":""}${f.title}</div>
+      <div class="fdesc">${f.desc}</div>
+      <div class="fmeta"><span class="badge ${sevBadge(f.sev)}">${f.sev}</span><span class="badge b-gray">${f.pillar}</span></div>
+    </div>
+    <div class="faction">${btn}</div>
+  </div>`;
+}
+function execF(id){ const f=findings[id]; if(!f?.fn) return; confirm2("Corriger : "+f.title,f.desc,async()=>{ try{ await f.fn(); findings[id].fixed=true; renderDashboard(); toast("✅ "+f.title,"success"); }catch(e){ toast("Erreur: "+e.message,"error"); } }); }
+
+// ── SCORING ───────────────────────────────────────────────────
+function getPillarScores(){
+  const tot=Math.max(D.users.length,1);
+  const id=Math.max(0,100-Math.round((D.noMfa.length/tot)*50)-Math.round((D.risky.length/tot)*30)-Math.round((D.inactive.length/tot)*20));
+  const devTot=Math.max(D.devices.length,1);
+  const dev=D.devices.length>0?Math.round((D.devices.filter(x=>x.complianceState==="compliant").length/devTot)*100):50;
+  const active=D.caPolicies.filter(p=>p.state==="enabled").length;
+  const app=Math.min(100,active*20+(D.legacyEnabled?0:30)+20);
+  const data=Math.min(100,D.labels.length*20+10);
+  const alerts=D.alerts.filter(a=>a.severity==="high"||a.severity==="critical").length;
+  const net=Math.min(100,D.namedLocs.length*25+(alerts===0?75:Math.max(0,75-alerts*15)));
+  return{Identités:Math.min(100,Math.max(0,id)),Appareils:Math.min(100,Math.max(0,dev)),Applications:Math.min(100,Math.max(0,app)),Données:Math.min(100,Math.max(0,data)),Réseau:Math.min(100,Math.max(0,net))};
+}
+function calcZT(){ const s=getPillarScores(); const v=Object.values(s); return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):0; }
+
+// ── RENDER DASHBOARD ─────────────────────────────────────────
+function renderDashboard(){
+  const score=calcZT();
+  document.getElementById("ztScore").textContent=score;
+  const arc=document.getElementById("scoreArc");
+  arc.style.strokeDashoffset=226-(226*(score/100));
+
+  const scoreCol=score>=70?"var(--teams-green)":score>=50?"var(--teams-amber)":"var(--teams-red)";
+  document.getElementById("ztScore").style.color=scoreCol;
+  document.getElementById("scoreDate").textContent="Dernier audit : "+(D.scannedAt?.toLocaleString("fr-FR")||"—");
+
+  const ps=getPillarScores();
+  const pColors={Identités:"#6264A7",Appareils:"#107C10",Applications:"#5C2E91",Données:"#835B00",Réseau:"#0F6CBD"};
+  document.getElementById("pillars").innerHTML=Object.entries(ps).map(([n,s])=>{
+    const c=s>=70?"var(--teams-lgreen)":s>=50?"var(--teams-lamber)":"var(--teams-lred)";
+    const tc=s>=70?"var(--teams-green)":s>=50?"var(--teams-amber)":"var(--teams-red)";
+    return `<span class="pillar-pill" style="background:${c};color:${tc};font-size:10px">${n} ${s}%</span>`;
+  }).join("");
+
+  // Adoption
+  const totLic=(D.licences||[]).reduce((s,l)=>s+(l.consumedUnits||0),0)||1;
+  const teamsCount=D.teams?.length||0;
+  const services=[
+    {n:"Teams",icon:"T",bg:"#EEF2FF",c:"#4F46E5",actifs:teamsCount,total:Math.max(teamsCount,1),note:"équipes"},
+    {n:"OneDrive",icon:"O",bg:"#F0FDF4",c:"#16A34A",actifs:Math.round(totLic*0.72),total:totLic,note:"est."},
+    {n:"Exchange",icon:"E",bg:"#FFF7ED",c:"#EA580C",actifs:Math.round(totLic*0.88),total:totLic,note:"est."},
+  ];
+  document.getElementById("adoptList").innerHTML=services.map(s=>{
+    const pct=Math.min(100,Math.round((s.actifs/s.total)*100));
+    const fc=pct>=80?"var(--teams-green)":pct>=50?"var(--teams-brand)":"var(--teams-amber)";
+    return `<div class="adop"><div class="adop-icon" style="background:${s.bg};color:${s.c}">${s.icon}</div><div class="adop-name">${s.n}</div><div class="adop-track"><div class="adop-fill" style="width:${pct}%;background:${fc}"></div></div><div class="adop-pct" style="color:${fc}">${pct}%</div><div class="adop-note">${fmt(s.actifs)} ${s.note}</div></div>`;
+  }).join("");
+  document.getElementById("adoptSub").textContent="MAJ "+new Date().toLocaleDateString("fr-FR");
+
+  // Checks
+  if(D.secureScore){
+    const CTRL=[{k:"MFARegistrationV2",l:"MFA enregistrement"},{k:"AdminMFAV2",l:"MFA admins"},{k:"BlockLegacyAuthentication",l:"Auth. legacy"},{k:"SigninRiskPolicy",l:"Risque connexion"},{k:"UserRiskPolicy",l:"Risque user"},{k:"SelfServicePasswordReset",l:"SSPR"}];
+    const controls=D.secureScore.controlScores||[];
+    document.getElementById("checks").innerHTML=CTRL.map(m=>{
+      const c=controls.find(x=>x.controlName===m.k); const ok=c&&c.score>0;
+      const cl=c?(ok?"b-green":"b-red"):"b-gray";
+      return `<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px"><div class="badge ${cl}">${c?(ok?"✓":"✗"):"?"}</div><div style="flex:1;color:var(--teams-text2)">${m.l}</div><div style="font-size:10px;color:var(--teams-text2)">${c?Math.round(c.score)+" pts":"—"}</div></div>`;
+    }).join("");
+  }
+
+  // Critical findings
+  const crit=findings.filter(f=>f.sev==="critical").slice(0,3);
+  document.getElementById("criticalList").innerHTML=crit.length>0?crit.map(f=>renderFinding(f)).join(""):'<div class="empty"><div class="empty-ico">✅</div><div class="empty-txt">Aucun risque critique</div></div>';
+
+  // Lic top
+  const top=(D.licences||[]).slice(0,4);
+  document.getElementById("licTop").innerHTML=top.length>0?top.map(l=>{
+    const taux=l.prepaidUnits?.enabled>0?Math.round((l.consumedUnits/l.prepaidUnits.enabled)*100):0;
+    const tc=taux>=80?"var(--teams-green)":taux>=50?"var(--teams-amber)":"var(--teams-red)";
+    return `<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span style="color:var(--teams-text2)">${SKU_NAMES[l.skuPartNumber]||l.skuPartNumber}</span><span style="color:${tc};font-weight:600">${taux}%</span></div><div class="prog" style="width:100%"><div class="prog-fill" style="width:${taux}%;background:${tc}"></div></div></div>`;
+  }).join(""):'<div class="empty"><div class="empty-txt">Chargement...</div></div>';
+
+  // Teams recent
+  const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-30);
+  const recent=(D.teams||[]).filter(t=>new Date(t.createdDateTime)>cutoff).slice(0,4);
+  document.getElementById("teamsRecent").innerHTML=recent.length>0?recent.map(t=>`<div class="tcard"><div class="tcard-icon" style="background:${t.visibility==="Public"?"#EEF2FF":"#F0FDF4"}">${t.visibility==="Public"?"🌐":"🔒"}</div><div><div style="font-size:12px;font-weight:600">${t.displayName}</div><div style="font-size:10px;color:var(--teams-text2)">${new Date(t.createdDateTime).toLocaleDateString("fr-FR")}</div></div></div>`).join(""):'<div class="empty"><div class="empty-txt">Aucune équipe ce mois</div></div>';
+}
+
+// ── USERS PANE ────────────────────────────────────────────────
+async function loadUsers(){
+  try{
+    if(D.users.length===0){ const d=await G("/users?$select=id,displayName,userPrincipalName,department,jobTitle,accountEnabled,assignedLicenses&$top=999&$orderby=displayName"); D.users=d.value||[]; }
+    const a=D.users.filter(u=>u.accountEnabled).length;
+    document.getElementById("usersTitle").textContent=`Utilisateurs (${D.users.length})`;
+    renderUsersTable(D.users);
+  }catch(e){ document.getElementById("usersBody").innerHTML=`<tr><td colspan="6">${errBox(e.message)}</td></tr>`; }
+}
+
+function renderUsersTable(users){
+  const colors=["#6264A7","#0891B2","#107C10","#5C2E91","#835B00","#C50F1F","#0F6CBD"];
+  document.getElementById("usersBody").innerHTML=users.slice(0,200).map((u,i)=>{
+    const ini=(u.displayName||"?").split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();
+    const col=colors[i%colors.length];
+    const lic=u.assignedLicenses?.length||0;
+    const stat=u.accountEnabled?'<span class="badge b-green">Actif</span>':'<span class="badge b-red">Inactif</span>';
+    return `<tr>
+      <td><div style="display:flex;align-items:center"><span class="av" style="background:${col}">${ini}</span><div><div style="font-weight:600;font-size:12px">${u.displayName||"—"}</div><div style="font-size:10px;color:var(--teams-text2)">${u.userPrincipalName||""}</div></div></div></td>
+      <td>${u.department||"—"}</td><td>${u.jobTitle||"—"}</td>
+      <td><span class="badge ${lic>0?"b-blue":"b-gray"}">${lic} lic.</span></td>
+      <td>${stat}</td>
+      <td><div style="display:flex;gap:4px;flex-wrap:wrap">
+        ${u.accountEnabled?`<button class="btn btn-sm btn-danger" onclick="toggleUser('${u.id}','${u.userPrincipalName}',false)">🚫</button>`:`<button class="btn btn-sm btn-success" onclick="toggleUser('${u.id}','${u.userPrincipalName}',true)">✅</button>`}
+        <button class="btn btn-sm btn-amber" onclick="resetMFA('${u.id}','${u.userPrincipalName}')">🔑</button>
+      </div></td>
+    </tr>`;
+  }).join("")||'<tr><td colspan="6"><div class="empty"><div class="empty-txt">Aucun utilisateur</div></div></td></tr>';
+}
+
+function filterUsers(){
+  const q=document.getElementById("usersQ").value.toLowerCase();
+  const f=document.getElementById("usersF").value;
+  const filtered=D.users.filter(u=>{
+    const mq=!q||(u.displayName||"").toLowerCase().includes(q)||(u.userPrincipalName||"").toLowerCase().includes(q);
+    const mf=f==="all"||(f==="active"&&u.accountEnabled)||(f==="inactive"&&!u.accountEnabled);
+    return mq&&mf;
+  });
+  renderUsersTable(filtered);
+}
+
+async function toggleUser(id,upn,enable){
+  try{ await Pa(`/users/${id}`,{accountEnabled:enable}); const u=D.users.find(x=>x.id===id); if(u) u.accountEnabled=enable; filterUsers(); toast(`${upn} ${enable?"activé":"bloqué"}`,"success"); }
+  catch(e){ toast("Erreur: "+e.message,"error"); }
+}
+
+async function resetMFA(id,upn){
+  confirm2("Reset MFA","Réinitialiser le MFA de "+upn,async()=>{
+    try{ await Pa(`/users/${id}`,{passwordPolicies:"DisablePasswordExpiration"}); toast("MFA réinitialisé pour "+upn,"success"); }
+    catch(e){ toast("Erreur: "+e.message,"error"); }
+  });
+}
+
+async function createUser(){
+  const first=document.getElementById("uFirst").value.trim();
+  const last=document.getElementById("uLast").value.trim();
+  const upn=document.getElementById("uUPN").value.trim();
+  const dept=document.getElementById("uDept").value.trim();
+  const title=document.getElementById("uTitle").value.trim();
+  const pwd=document.getElementById("uPwd").value;
+  if(!first||!last||!upn||!pwd){ toast("Remplis tous les champs obligatoires","warn"); return; }
+  try{
+    await Po("/users",{accountEnabled:true,displayName:first+" "+last,givenName:first,surname:last,userPrincipalName:upn,mailNickname:upn.split("@")[0],department:dept||undefined,jobTitle:title||undefined,passwordProfile:{forceChangePasswordNextSignIn:true,password:pwd}});
+    toast("✅ Utilisateur créé","success"); closeModal("mCreateUser"); tabDone.users=false; await loadUsers();
+  }catch(e){ toast("Erreur: "+e.message,"error"); }
+}
+
+// ── SECURITY PANE ─────────────────────────────────────────────
+async function loadSecureScore(){
+  if(!D.secureScore) await scanSecureScore();
+  renderSecurityPane();
+}
+
+async function loadAlerts(){
+  if(D.alerts.length===0) await scanAlerts_();
+}
+
+async function loadCA(){
+  if(D.caPolicies.length===0) await scanCA();
+}
+
+async function loadNoMFA(){
+  if(D.noMfa.length===0) await scanIdentities();
+}
+
+function renderSecurityPane(){
+  if(!D.secureScore) return;
+  const sc=D.secureScore;
+  const pct=Math.round((sc.currentScore/sc.maxScore)*100);
+  const col=pct>=70?"var(--teams-green)":pct>=50?"var(--teams-amber)":"var(--teams-red)";
+  document.getElementById("secNum").textContent=pct+"%";
+  document.getElementById("secNum").style.color=col;
+  document.getElementById("secCircle").style.borderColor=col;
+  document.getElementById("secPts").textContent=sc.currentScore+" pts / "+sc.maxScore;
+
+  const CTRL=[{k:"MFARegistrationV2",l:"MFA (enregistrement)"},{k:"AdminMFAV2",l:"MFA admins"},{k:"BlockLegacyAuthentication",l:"Auth. legacy bloquée"},{k:"SigninRiskPolicy",l:"Risque connexion"},{k:"UserRiskPolicy",l:"Risque utilisateur"},{k:"SelfServicePasswordReset",l:"SSPR activé"},{k:"IntegratedApps",l:"Contrôle apps"}];
+  const controls=sc.controlScores||[];
+  document.getElementById("secChecks").innerHTML=CTRL.map(m=>{
+    const c=controls.find(x=>x.controlName===m.k); const ok=c&&c.score>0;
+    const cl=c?(ok?"b-green":"b-red"):"b-gray";
+    return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px"><div class="badge ${cl}">${c?(ok?"✓":"✗"):"?"}</div><div style="flex:1;color:var(--teams-text2)">${m.l}</div><div style="font-size:10px;color:var(--teams-text2)">${c?Math.round(c.score)+" pts":"—"}</div></div>`;
+  }).join("");
+
+  const actions=controls.filter(c=>c.score<c.maxScore&&c.maxScore>0).sort((a,b)=>(b.maxScore-b.score)-(a.maxScore-a.score)).slice(0,5);
+  document.getElementById("secActions").innerHTML=actions.map(a=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px"><span style="color:var(--teams-text2)">${a.controlName}</span><span style="color:var(--teams-brand);font-weight:600">+${Math.round(a.maxScore-a.score)} pts</span></div>`).join("")||'<div class="empty-txt" style="color:var(--teams-text2)">Aucune action disponible</div>';
+
+  document.getElementById("alertsList").innerHTML=D.alerts.slice(0,8).map(a=>{
+    const sev=a.severity||"low";
+    const cl=sev==="high"||sev==="critical"?"b-red":sev==="medium"?"b-amber":"b-blue";
+    return `<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);align-items:flex-start;font-size:11.5px">
+      <span class="badge ${cl}">${sev}</span>
+      <div style="flex:1"><div style="font-weight:600">${a.title||a.name||"Alerte"}</div><div style="color:var(--teams-text2);font-size:10.5px">${(a.description||"").substring(0,80)}</div></div>
+      ${a.id?`<button class="btn btn-sm btn-ghost" onclick="dismissAlert('${a.id}')">✓</button>`:""}
+    </div>`;
+  }).join("")||'<div class="empty"><div class="empty-ico">✅</div><div class="empty-txt">Aucune alerte</div></div>';
+
+  document.getElementById("noMfaList").innerHTML=D.noMfa.slice(0,15).map(u=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><div><div style="font-weight:500">${u.userDisplayName||u.userPrincipalName}</div><div style="font-size:10px;color:var(--teams-text2)">${u.userPrincipalName}</div></div><button class="btn btn-sm btn-amber" onclick="resetMFA('${u.userId}','${u.userPrincipalName}')">🔑 Forcer MFA</button></div>`).join("")||'<div class="empty"><div class="empty-ico">✅</div><div class="empty-txt">Tous les users ont le MFA</div></div>';
+
+  document.getElementById("caList").innerHTML=D.caPolicies.map(p=>{
+    const st=p.state==="enabled"?"b-green":p.state==="enabledForReportingButNotEnforced"?"b-amber":"b-gray";
+    const stl=p.state==="enabled"?"Activée":p.state==="enabledForReportingButNotEnforced"?"Mode rapport":"Désactivée";
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><div style="font-weight:500">${p.displayName||"—"}</div><span class="badge ${st}">${stl}</span></div>`;
+  }).join("")||'<div class="empty"><div class="empty-txt">Aucune politique CA</div></div>';
+}
+
+// ── LICENCES PANE ─────────────────────────────────────────────
+async function loadLicences(){
+  try{
+    const d=await G("/subscribedSkus");
+    D.licences=(d.value||[]).filter(s=>s.prepaidUnits?.enabled>0);
+    let totA=0,totAtt=0,totD=0,totC=0;
+    D.licences.forEach(l=>{ const a=l.prepaidUnits?.enabled||0,at=l.consumedUnits||0; totA+=a; totAtt+=at; totD+=a-at; totC+=((a-at)*(SKU_PRICE[l.skuPartNumber]||0)); });
+    document.getElementById("kLic").textContent=fmt(totAtt);
+    document.getElementById("kLicSub").textContent=fmt(totA)+" achetées";
+    document.getElementById("licStats").innerHTML=[
+      {v:fmt(totA),l:"Achetées",c:"var(--teams-brand)"},{v:fmt(totAtt),l:"Attribuées",c:"var(--teams-green)"},
+      {v:fmt(totD),l:"Disponibles",c:totD>0?"#0891B2":"var(--teams-red)"},{v:totC>0?fmt(totC)+"€":"—",l:"Coût inactif/mois",c:"var(--teams-amber)"},
+    ].map(s=>`<div class="smini"><div class="smini-val" style="color:${s.c}">${s.v}</div><div class="smini-lbl">${s.l}</div></div>`).join("");
+
+    document.getElementById("licBody").innerHTML=D.licences.map(l=>{
+      const a=l.prepaidUnits?.enabled||0,at=l.consumedUnits||0,d=a-at;
+      const taux=a>0?Math.round((at/a)*100):0;
+      const prix=SKU_PRICE[l.skuPartNumber]||0;
+      const tc=taux>=80?"#107C10":taux>=50?"#835B00":"#C50F1F";
+      const bc=l.capabilityStatus==="Enabled"?"b-green":l.capabilityStatus==="Warning"?"b-amber":"b-red";
+      return `<tr><td><strong>${SKU_NAMES[l.skuPartNumber]||l.skuPartNumber}</strong></td><td style="font-size:10.5px;color:var(--teams-text2)">${l.skuPartNumber}</td><td>${fmt(a)}</td><td style="color:var(--teams-brand);font-weight:600">${fmt(at)}</td><td style="color:${d>10?"var(--teams-green)":d>0?"var(--teams-amber)":"var(--teams-red)"};font-weight:600">${fmt(d)}</td><td><div class="prog"><div class="prog-fill" style="width:${taux}%;background:${tc}"></div></div><span style="color:${tc};font-weight:600">${taux}%</span></td><td style="color:${prix>0&&d>0?"var(--teams-red)":"var(--teams-text2)"}">${prix>0&&d>0?(d*prix)+"€":""}</td><td><span class="badge ${bc}">${l.capabilityStatus==="Enabled"?"Actif":"⚠ "+l.capabilityStatus}</span></td></tr>`;
+    }).join("")||'<tr><td colspan="8" style="text-align:center;padding:16px;color:var(--teams-text2)">Aucune licence</td></tr>';
+
+    const reco=D.licences.filter(l=>(l.consumedUnits||0)<(l.prepaidUnits?.enabled||0)*0.5&&(l.prepaidUnits?.enabled||0)>5);
+    document.getElementById("licReco").innerHTML=reco.length>0?reco.map(l=>{
+      const d=(l.prepaidUnits?.enabled||0)-(l.consumedUnits||0); const prix=SKU_PRICE[l.skuPartNumber]||0;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px"><div><strong>${SKU_NAMES[l.skuPartNumber]||l.skuPartNumber}</strong> — ${d} licences inutilisées</div><div style="color:var(--teams-red);font-weight:600">${prix>0?(d*prix)+"€/mois":""}</div></div>`;
+    }).join(""):'<div class="empty"><div class="empty-ico">✅</div><div class="empty-txt">Aucune anomalie détectée</div></div>';
+  }catch(e){ document.getElementById("licBody").innerHTML=`<tr><td colspan="8">${errBox(e.message)}</td></tr>`; }
+}
+
+async function reclaimLicences(){
+  toast("Analyse des licences inactives...","info");
+  try{
+    const d=await G("/users?$select=id,userPrincipalName,assignedLicenses,signInActivity&$top=999&$filter=accountEnabled eq true",true);
+    const c90=new Date(); c90.setDate(c90.getDate()-90);
+    const inactive=(d.value||[]).filter(u=>{ const l=u.signInActivity?.lastSignInDateTime; return u.assignedLicenses?.length>0&&l&&new Date(l)<c90; });
+    if(inactive.length===0){ toast("Aucun compte inactif avec licences","info"); return; }
+    toast(`${inactive.length} comptes inactifs identifiés — voir la liste`,"warn");
+  }catch(e){ toast("Erreur: "+e.message,"error"); }
+}
+
+// ── TEAMS PANE ────────────────────────────────────────────────
+async function loadTeamsPane(){
+  try{
+    const d=await G("/groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team')&$select=id,displayName,description,createdDateTime,visibility,mail&$top=999");
+    D.teams=d.value||[];
+    const pub=D.teams.filter(t=>t.visibility==="Public").length;
+    const priv=D.teams.filter(t=>t.visibility==="Private").length;
+    const c30=new Date(); c30.setDate(c30.getDate()-30);
+    const rec=D.teams.filter(t=>new Date(t.createdDateTime)>c30).length;
+    document.getElementById("teamsTitle").textContent=`Teams & Groupes (${D.teams.length})`;
+    document.getElementById("kTeams").textContent=fmt(D.teams.length);
+    document.getElementById("kTeamsSub").textContent=pub+" publiques · "+priv+" privées";
+    document.getElementById("teamsStats").innerHTML=[
+      {v:fmt(D.teams.length),l:"Teams total",c:"var(--teams-brand)"},{v:fmt(pub),l:"Publiques",c:"var(--teams-green)"},
+      {v:fmt(priv),l:"Privées",c:"var(--teams-purple)"},{v:fmt(rec),l:"Créées (30j)",c:"#0891B2"},
+    ].map(s=>`<div class="smini"><div class="smini-val" style="color:${s.c}">${s.v}</div><div class="smini-lbl">${s.l}</div></div>`).join("");
+    renderTeamsList(D.teams);
+  }catch(e){ document.getElementById("teamsList").innerHTML=errBox(e.message); }
+}
+
+function renderTeamsList(teams){
+  document.getElementById("teamsList").innerHTML=teams.map(t=>`
+    <div class="tcard" onclick="selectTeam('${t.id}')">
+      <div class="tcard-icon" style="background:${t.visibility==="Public"?"#EEF2FF":"#F0FDF4"}">${t.visibility==="Public"?"🌐":"🔒"}</div>
+      <div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.displayName}</div><div style="font-size:10px;color:var(--teams-text2)">${t.visibility} · ${new Date(t.createdDateTime).toLocaleDateString("fr-FR")}</div></div>
+      <span class="badge ${t.visibility==="Public"?"b-green":"b-purple"}">${t.visibility}</span>
+    </div>`).join("")||'<div class="empty"><div class="empty-txt">Aucune équipe</div></div>';
+}
+
+function filterTeams(){
+  const q=document.getElementById("teamsQ").value.toLowerCase();
+  const f=document.getElementById("teamsF").value;
+  renderTeamsList(D.teams.filter(t=>(!q||(t.displayName||"").toLowerCase().includes(q))&&(f==="all"||t.visibility===f)));
+}
+
+async function selectTeam(id){
+  const team=D.teams.find(t=>t.id===id); if(!team) return;
+  document.getElementById("teamDetail").innerHTML='<div style="color:var(--teams-text2);font-size:11px;padding:8px">Chargement...</div>';
+  try{
+    const members=await G(`/groups/${id}/members?$select=id,displayName,userPrincipalName&$top=50`);
+    const mems=members.value||[];
+    document.getElementById("teamDetail").innerHTML=`
+      <div style="margin-bottom:12px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:3px">${team.displayName}</div>
+        <div style="font-size:11px;color:var(--teams-text2);margin-bottom:8px">${team.description||"Aucune description"}</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">
+          <span class="badge ${team.visibility==="Public"?"b-green":"b-purple"}">${team.visibility}</span>
+          <span class="badge b-gray">${new Date(team.createdDateTime).toLocaleDateString("fr-FR")}</span>
+          <span class="badge b-blue">${mems.length} membres</span>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-danger" onclick="archiveTeam('${id}','${team.displayName.replace(/'/g,"\\'")}')">📦 Archiver</button>
+        </div>
+      </div>
+      <div style="font-size:11px;font-weight:600;margin-bottom:6px">Membres (${mems.length})</div>
+      <div style="max-height:180px;overflow-y:auto">
+        ${mems.map((m,i)=>`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px"><span class="av" style="background:${["#6264A7","#0891B2","#107C10","#5C2E91","#835B00"][i%5]};width:22px;height:22px;font-size:8px">${(m.displayName||"?")[0].toUpperCase()}</span><div><div style="font-weight:500">${m.displayName}</div><div style="font-size:9.5px;color:var(--teams-text2)">${m.userPrincipalName||""}</div></div></div>`).join("")}
+      </div>`;
+  }catch(e){ document.getElementById("teamDetail").innerHTML=errBox(e.message); }
+}
+
+async function createTeam(){
+  const name=document.getElementById("tName").value.trim();
+  const desc=document.getElementById("tDesc").value.trim();
+  const vis=document.getElementById("tVis").value;
+  if(!name){ toast("Le nom est obligatoire","warn"); return; }
+  try{
+    await Po("/teams",{"template@odata.bind":"https://graph.microsoft.com/v1.0/teamsTemplates('standard')",displayName:name,description:desc||name,visibility:vis});
+    toast(`✅ Équipe "${name}" créée`,"success"); closeModal("mCreateTeam"); tabDone.teams=false; await loadTeamsPane();
+  }catch(e){ toast("Erreur: "+e.message,"error"); }
+}
+
+async function archiveTeam(id,name){
+  confirm2("Archiver l'équipe","Archiver \""+name+"\" — elle sera en lecture seule.",async()=>{
+    try{ await Po(`/teams/${id}/archive`,{}); toast(`✅ "${name}" archivée`,"success"); tabDone.teams=false; await loadTeamsPane(); }
+    catch(e){ toast("Erreur: "+e.message,"error"); }
+  });
+}
+
+// ── REPORTS ───────────────────────────────────────────────────
+async function loadReports(){
+  const sc=D.secureScore?Math.round((D.secureScore.currentScore/D.secureScore.maxScore)*100):0;
+  const totLic=(D.licences||[]).reduce((s,l)=>s+(l.prepaidUnits?.enabled||0),0);
+  const totAtt=(D.licences||[]).reduce((s,l)=>s+(l.consumedUnits||0),0);
+  document.getElementById("reportStats").innerHTML=[
+    {v:fmt(totLic),l:"Licences totales",c:"var(--teams-brand)"},{v:fmt(totAtt),l:"Licences utilisées",c:"var(--teams-green)"},
+    {v:fmt(D.teams?.length||0),l:"Équipes Teams",c:"var(--teams-purple)"},{v:sc+"%",l:"Secure Score",c:sc>=70?"var(--teams-green)":sc>=50?"var(--teams-amber)":"var(--teams-red)"},
+  ].map(s=>`<div class="smini"><div class="smini-val" style="color:${s.c}">${s.v}</div><div class="smini-lbl">${s.l}</div></div>`).join("");
+  renderReports();
+}
+
+function renderReports(){
+  const totLic=Math.max((D.licences||[]).reduce((s,l)=>s+(l.consumedUnits||0),0),1);
+  const teams=D.teams?.length||0;
+  // Adoption chart
+  document.getElementById("rAdopt").innerHTML=`<div class="hbar">`+[
+    {l:"Teams",v:Math.min(100,Math.round(teams/Math.max(teams,1)*100)),c:"var(--teams-brand)"},
+    {l:"OneDrive",v:72,c:"var(--teams-green)"},{l:"Exchange",v:88,c:"#EA580C"},
+  ].map(i=>`<div class="hbar-item"><div class="hbar-lbl">${i.l}</div><div class="hbar-track"><div class="hbar-fill" style="width:${i.v}%;background:${i.c}"></div></div><div class="hbar-val" style="color:${i.c}">${i.v}%</div></div>`).join("")+`</div>`;
+
+  // Lic donut
+  const colors=["#6264A7","#0891B2","#107C10","#5C2E91","#835B00"];
+  const top=(D.licences||[]).slice(0,5); const total=top.reduce((s,l)=>s+(l.consumedUnits||0),0)||1;
+  let offset=0; const r=42; const circ=2*Math.PI*r;
+  const paths=top.map((l,i)=>{ const dash=(l.consumedUnits||0)/total*circ; const p=`<circle cx="55" cy="55" r="${r}" fill="none" stroke="${colors[i]}" stroke-width="16" stroke-dasharray="${dash} ${circ}" stroke-dashoffset="${-offset}" transform="rotate(-90 55 55)"/>`; offset+=dash; return p; });
+  const legend=top.map((l,i)=>`<div class="legend-item"><div class="legend-dot" style="background:${colors[i]}"></div><div style="flex:1;font-size:10.5px">${(SKU_NAMES[l.skuPartNumber]||l.skuPartNumber).substring(0,18)}</div><div style="font-weight:600;font-size:10.5px">${l.consumedUnits||0}</div></div>`).join("");
+  document.getElementById("rLic").innerHTML=`<div class="donut-rel"><svg viewBox="0 0 110 110" width="110" height="110"><circle cx="55" cy="55" r="${r}" fill="none" stroke="var(--teams-hover)" stroke-width="16"/>${paths.join("")}</svg><div class="donut-center"><div class="donut-val" style="font-size:16px">${fmt(total)}</div><div class="donut-sub">licences</div></div></div><div class="legend">${legend}</div>`;
+
+  // Teams chart
+  const pub=(D.teams||[]).filter(t=>t.visibility==="Public").length;
+  const priv=(D.teams||[]).filter(t=>t.visibility==="Private").length;
+  const tot=Math.max(D.teams?.length||1,1);
+  document.getElementById("rTeams").innerHTML=`<div class="hbar">`+[
+    {l:"Publiques",v:Math.round(pub/tot*100),c:"var(--teams-green)"},
+    {l:"Privées",v:Math.round(priv/tot*100),c:"var(--teams-purple)"},
+  ].map(i=>`<div class="hbar-item"><div class="hbar-lbl">${i.l}</div><div class="hbar-track"><div class="hbar-fill" style="width:${i.v}%;background:${i.c}"></div></div><div class="hbar-val" style="color:${i.c}">${i.v}%</div></div>`).join("")+`</div>`;
+
+  // Security chart
+  const ps=getPillarScores();
+  const pc={"Identités":"#6264A7","Appareils":"#107C10","Applications":"#5C2E91","Données":"#835B00","Réseau":"#0F6CBD"};
+  document.getElementById("rSec").innerHTML=`<div class="hbar">`+Object.entries(ps).map(([n,s])=>`<div class="hbar-item"><div class="hbar-lbl">${n}</div><div class="hbar-track"><div class="hbar-fill" style="width:${s}%;background:${pc[n]||"var(--teams-brand)"}"></div></div><div class="hbar-val" style="color:${s>=70?"var(--teams-green)":s>=50?"var(--teams-amber)":"var(--teams-red)"}">${s}%</div></div>`).join("")+`</div>`;
+}
+
+// ── ACTIONS ───────────────────────────────────────────────────
+function renderActions(){
+  const aMap={
+    aIdentity:[
+      {l:"Forcer MFA — tous les users sans MFA",sev:"danger",fn:enableMFAAll,count:D.noMfa.length},
+      {l:"Désactiver les comptes inactifs +90j",sev:"amber",fn:disableInactive,count:D.inactive.length},
+      {l:"Révoquer sessions utilisateurs à risque",sev:"danger",fn:revokeRisky,count:D.risky.length},
+    ],
+    aApps:[
+      {l:"Créer politique CA — MFA obligatoire",sev:"brand",fn:createMFAPolicy,count:0},
+      {l:"Bloquer auth. legacy (SMTP/IMAP/POP3)",sev:"danger",fn:blockLegacyAuth,count:D.legacyEnabled?1:0},
+      {l:"Activer SSPR pour tous les utilisateurs",sev:"success",fn:enableSSPR,count:0},
+    ],
+    aData:[
+      {l:"Créer les 4 Sensitivity Labels de base",sev:"brand",fn:createLabels,count:D.labels.length===0?1:0},
+    ],
+    aNet:[
+      {l:"Fermer les alertes haute priorité",sev:"danger",fn:dismissHighAlerts,count:D.alerts.filter(a=>a.severity==="high").length},
+    ],
+  };
+  Object.entries(aMap).forEach(([id,items])=>{
+    document.getElementById(id).innerHTML=items.map(item=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:11.5px">
+      <div style="flex:1">${item.l}${item.count>0?`<span class="badge b-red" style="margin-left:5px">${item.count}</span>`:""}</div>
+      <button class="btn btn-sm btn-${item.sev}" onclick="doAction('${item.l}',${item.fn.name})">${item.count>0?"⚡ Exécuter":"Créer"}</button>
+    </div>`).join("");
+  });
+}
+
+function doAction(label,fn){ confirm2("Confirmer","Exécuter : "+label,async()=>{ try{ await fn(); toast("✅ "+label,"success"); }catch(e){ toast("Erreur: "+e.message,"error"); } }); }
+
+// ── CORRECTIVE ACTIONS ────────────────────────────────────────
+async function enableMFAAll(){ await Pa("/policies/authenticationMethodsPolicy",{registrationEnforcement:{authenticationMethodsRegistrationCampaign:{snoozeDurationInDays:0,state:"enabled",excludeTargets:[],includeTargets:[{id:"all_users",targetType:"group",targetedAuthenticationMethod:"microsoftAuthenticator"}]}}},true); toast("✅ Campagne MFA activée","success"); }
+async function disableInactive(){ let c=0; for(const u of D.inactive.slice(0,10)){ try{ await Pa(`/users/${u.id}`,{accountEnabled:false}); c++; }catch(e){} } toast(`✅ ${c} comptes inactifs désactivés`,"success"); }
+async function revokeRisky(){ let c=0; for(const u of D.risky.slice(0,20)){ try{ await Po(`/users/${u.id}/revokeSignInSessions`,{}); c++; }catch(e){} } toast(`✅ ${c} sessions révoquées`,"success"); }
+async function createMFAPolicy(){ await Po("/identity/conditionalAccess/policies",{displayName:"[ZeroTrust] MFA Required",state:"enabled",conditions:{users:{includeUsers:["All"]},applications:{includeApplications:["All"]}},grantControls:{operator:"OR",builtInControls:["mfa"]}},true); toast("✅ Politique CA MFA créée","success"); }
+async function blockLegacyAuth(){ await Po("/identity/conditionalAccess/policies",{displayName:"[ZeroTrust] Block Legacy Auth",state:"enabled",conditions:{users:{includeUsers:["All"]},applications:{includeApplications:["All"]},clientAppTypes:["exchangeActiveSync","other"]},grantControls:{operator:"OR",builtInControls:["block"]}},true); D.legacyEnabled=false; toast("✅ Auth. legacy bloquée","success"); }
+async function enableSSPR(){ await Pa("/policies/authenticationMethodsPolicy",{selfServicePasswordReset:{state:"enabled"}},true).catch(()=>{}); toast("✅ SSPR activé","success"); }
+async function createLabels(){ let c=0; for(const l of ["Public","Interne","Confidentiel","Très Confidentiel"]){ try{ await Po("/security/informationProtection/sensitivityLabels",{displayName:l,isEnabled:true},true); c++; }catch(e){} } toast(`✅ ${c} labels créés`,"success"); }
+async function dismissHighAlerts(){ let c=0; for(const a of D.alerts.filter(x=>x.severity==="high").slice(0,10)){ try{ await Pa(`/security/alerts_v2/${a.id}`,{status:"resolved"},true).catch(()=>Pa(`/security/alerts/${a.id}`,{status:"resolved"},true)); c++; }catch(e){} } toast(`✅ ${c} alertes fermées`,"success"); }
+async function dismissAlert(id){ try{ await Pa(`/security/alerts_v2/${id}`,{status:"resolved"},true).catch(()=>Pa(`/security/alerts/${id}`,{status:"resolved"},true)); D.alerts=D.alerts.filter(a=>a.id!==id); renderSecurityPane(); toast("✅ Alerte fermée","success"); }catch(e){ toast("Erreur: "+e.message,"error"); } }
+async function fixAllCritical(){ confirm2("Corriger TOUS les critiques","MFA + Bloquer legacy + Créer CA MFA",async()=>{ try{ await enableMFAAll(); await new Promise(r=>setTimeout(r,500)); if(D.legacyEnabled) await blockLegacyAuth(); await new Promise(r=>setTimeout(r,500)); await createMFAPolicy(); toast("✅ Toutes les corrections critiques appliquées","success"); await runScan(); }catch(e){ toast("Erreur: "+e.message,"error"); } }); }
+
+// ── EXPORT ────────────────────────────────────────────────────
+function exportCSV(){
+  const rows=[["Sévérité","Titre","Description","Pilier","Statut"]];
+  findings.forEach(f=>rows.push([f.sev,f.title,f.desc,f.pillar,f.fixed?"Corrigé":"Ouvert"]));
+  const csv="\uFEFF"+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="M365_Audit_"+new Date().toISOString().slice(0,10)+".csv"; a.click(); URL.revokeObjectURL(url);
+  toast("✅ CSV exporté","success");
+}
+
+// ── TEAMS SDK INIT ────────────────────────────────────────────
+async function initTeamsSDK(){
+  try{
+    await microsoftTeams.app.initialize();
+    const ctx=await microsoftTeams.app.getContext();
+    // Adapter le thème Teams
+    if(ctx.app?.theme==="dark") document.body.classList.add("dark");
+    microsoftTeams.app.registerOnThemeChangeHandler(theme=>{ document.body.classList.toggle("dark",theme==="dark"); });
+    return true;
+  }catch(e){ return false; }
+}
+
+// ── BOOT ──────────────────────────────────────────────────────
+(async function boot(){
+  // Init Teams SDK si disponible
+  await initTeamsSDK().catch(()=>{});
+
+  // Lire l'onglet depuis l'URL
+  const urlTab=new URLSearchParams(window.location.search).get("tab");
+
+  try{
+    await initMSAL();
+    const redirectResult=await msalApp.handleRedirectPromise();
+    if(redirectResult?.account){
+      currentAccount=redirectResult.account;
+      document.getElementById("splash").classList.add("hidden");
+      document.getElementById("app").classList.add("visible");
+      document.getElementById("hUser").textContent=currentAccount.username;
+      await Promise.allSettled([loadLicences(),loadTeamsPane()]);
+      await runScan();
+      if(urlTab) go(urlTab);
+      return;
+    }
+    const accounts=msalApp.getAllAccounts();
+    if(accounts.length>0){
+      currentAccount=accounts[0];
+      document.getElementById("splash").classList.add("hidden");
+      document.getElementById("app").classList.add("visible");
+      document.getElementById("hUser").textContent=currentAccount.username;
+      await Promise.allSettled([loadLicences(),loadTeamsPane()]);
+      await runScan();
+      if(urlTab) go(urlTab);
+      return;
+    }
+    // Pas connecté — lancer le redirect
+    document.getElementById("splash").classList.add("hidden");
+    // Si dans Teams, essayer le SSO silencieux
+    try{
+      if(typeof microsoftTeams!=="undefined"){
+        const token=await microsoftTeams.authentication.getAuthToken();
+        // SSO réussi — utiliser le token
+        toast("✅ Connecté via Teams SSO","success");
+      }
+    }catch(e){}
+    // Sinon redirect classique
+    await msalApp.loginRedirect({scopes:SCOPES,prompt:"select_account"});
+  }catch(e){
+    document.getElementById("splash").classList.add("hidden");
+    await msalApp.loginRedirect({scopes:SCOPES}).catch(()=>{});
+  }
+})();
+</script>
+</body>
+</html>
